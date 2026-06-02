@@ -1,42 +1,20 @@
 import "server-only";
-import { PgBoss } from "pg-boss";
 import { BILLING_JOBS, type BillingJobName, type BillingJobPayloads } from "@brazil-tms/shared";
+import { getBffBoss } from "@/lib/queue/boss";
 
 /**
- * Feature 008 — BFF-side enqueue client for the on-demand `billing.export` job (R11). The export
- * route validates + writes the `export_batches` row + enqueues; the worker drains the same
- * Postgres-backed queue and does the heavy ExcelJS generation off the request path. Mirrors
- * `lib/imports/queue.ts`: ONE lazily-started PgBoss sender per Next server process.
+ * Feature 008 — BFF-side enqueue for the on-demand `billing.export` job (R11). The export route
+ * validates + writes the `export_batches` row + enqueues; the worker drains the same Postgres-backed
+ * queue and does the heavy ExcelJS generation off the request path. Delegates to the single shared,
+ * HMR-safe pg-boss sender (`lib/queue/boss.ts`) so the Next server keeps exactly one pool.
  */
-
-let bossPromise: Promise<PgBoss> | undefined;
-
-async function getBoss(): Promise<PgBoss> {
-  if (!bossPromise) {
-    bossPromise = (async () => {
-      const connectionString = process.env.DATABASE_URL;
-      if (!connectionString) {
-        throw new Error("DATABASE_URL is required to enqueue billing jobs.");
-      }
-      const boss = new PgBoss({ connectionString });
-      boss.on("error", (err: Error) => console.error("[pg-boss/bff] error", err));
-      await boss.start();
-      // Ensure the queue exists (idempotent) so send() works even if the worker hasn't booted yet.
-      for (const name of Object.values(BILLING_JOBS)) {
-        await boss.createQueue(name);
-      }
-      return boss;
-    })();
-  }
-  return bossPromise;
-}
 
 /** Typed enqueue — the only way the BFF should publish a billing job. */
 export async function enqueueBillingJob<K extends BillingJobName>(
   name: K,
   data: BillingJobPayloads[K],
 ): Promise<string | null> {
-  const boss = await getBoss();
+  const boss = await getBffBoss();
   return boss.send(name, data as object);
 }
 
