@@ -65,6 +65,21 @@ function uniqueName(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 }
 
+/** Create a template through the UI (one column mapping). Assumes the customer is already selected. */
+async function createTemplateViaUI(
+  page: Page,
+  opts: { name: string; version?: number; source?: string; target?: string },
+): Promise<void> {
+  await page.getByRole("button", { name: PT.new }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel(PT.name, { exact: true }).fill(opts.name);
+  await dialog.getByLabel(PT.version, { exact: true }).fill(String(opts.version ?? 1));
+  await dialog.getByLabel(/coluna do arquivo 1/i).fill(opts.source ?? "col_a");
+  await selectTarget(page, 0, opts.target ?? "externalTripId");
+  await dialog.getByRole("button", { name: PT.create }).click();
+}
+
 async function gotoAdmin(page: Page): Promise<void> {
   await page.goto("/admin/import-templates");
   // Select the seeded DEMO-SHOPEE customer.
@@ -169,6 +184,70 @@ test.describe("US1 — author a template in-app", () => {
     await dialog.getByRole("button", { name: PT.create }).click();
 
     await expect(dialog.getByText(PT.atLeastOne)).toBeVisible();
+    await expect(dialog).toBeVisible();
+  });
+});
+
+test.describe("US2 — review, edit, and version templates", () => {
+  test("edit a mapping → save → reopening shows the change", async ({ page }) => {
+    await signIn(page, testAccounts.admin);
+    await gotoAdmin(page);
+
+    const name = uniqueName("E2E-EDIT");
+    await createTemplateViaUI(page, { name, source: "orig_col", target: "originCode" });
+    await expect(page.getByText(PT.createdMsg)).toBeVisible();
+
+    const row = page.getByRole("row", { name: new RegExp(name) });
+    await row.getByRole("button", { name: "Editar" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    const source = dialog.getByLabel(/coluna do arquivo 1/i);
+    await expect(source).toHaveValue("orig_col");
+    await source.fill("orig_col_edited");
+    await dialog.getByRole("button", { name: "Salvar", exact: true }).click();
+
+    await expect(page.getByText("Modelo atualizado com sucesso.")).toBeVisible();
+    // Reopen → the change persisted (refetch).
+    await row.getByRole("button", { name: "Editar" }).click();
+    await expect(page.getByRole("dialog").getByLabel(/coluna do arquivo 1/i)).toHaveValue(
+      "orig_col_edited",
+    );
+  });
+
+  test("Criar nova versão pre-fills version = max+1 and creates a distinct version", async ({
+    page,
+  }) => {
+    await signIn(page, testAccounts.admin);
+    await gotoAdmin(page);
+
+    const name = uniqueName("E2E-VER");
+    await createTemplateViaUI(page, { name, version: 1 });
+    await expect(page.getByText(PT.createdMsg)).toBeVisible();
+
+    const row = page.getByRole("row", { name: new RegExp(name) });
+    await row.getByRole("button", { name: "Criar nova versão" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByLabel(PT.version, { exact: true })).toHaveValue("2");
+    await dialog.getByRole("button", { name: PT.create }).click();
+    await expect(page.getByText(PT.createdMsg)).toBeVisible();
+
+    // Both versions are now listed for that name.
+    await expect(page.getByRole("row", { name: new RegExp(name) })).toHaveCount(2);
+  });
+
+  test("a duplicate (customer, name, version) shows the exact pt-BR duplicate message", async ({
+    page,
+  }) => {
+    await signIn(page, testAccounts.admin);
+    await gotoAdmin(page);
+
+    const name = uniqueName("E2E-DUPKEY");
+    await createTemplateViaUI(page, { name, version: 1 });
+    await expect(page.getByText(PT.createdMsg)).toBeVisible();
+
+    await createTemplateViaUI(page, { name, version: 1 });
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText("Já existe um modelo com esse nome e versão.")).toBeVisible();
     await expect(dialog).toBeVisible();
   });
 });

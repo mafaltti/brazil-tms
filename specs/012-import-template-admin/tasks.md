@@ -107,13 +107,13 @@ e versão." (not a generic error).
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T014 [US2] Extend `apps/web/e2e/import-template-admin.spec.ts` with US2 cases: edit a mapping → save → refetch shows the change; "Criar nova versão" opens the form pre-filled with version = max+1 (editable) and saving creates a distinct version (both listed); creating a duplicate `(customer, name, version)` yields a 409 and the exact pt-BR message `Já existe um modelo com esse nome e versão.`. (same file as T010 → after T010)
+- [X] T014 [US2] Extend `apps/web/e2e/import-template-admin.spec.ts` with US2 cases: edit a mapping → save → refetch shows the change; "Criar nova versão" opens the form pre-filled with version = max+1 (editable) and saving creates a distinct version (both listed); creating a duplicate `(customer, name, version)` yields a 409 and the exact pt-BR message `Já existe um modelo com esse nome e versão.`. (same file as T010 → after T010)
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Add edit-in-place to `import-templates-client.tsx`: open a non-archived template in the shared form (T011) seeded from its current config, save via the update PATCH mutation (config fields only), and invalidate. (depends on T011, T013)
-- [ ] T016 [US2] Add the "Criar nova versão" list action in `import-templates-client.tsx`: copy the selected template's config (drop id/createdAt/updatedAt), set `version = nextVersion(list, name)` (editable), open the create form pre-filled, and POST the existing create endpoint. (depends on T013; uses `nextVersion` from T004)
-- [ ] T017 [US2] In the create/edit flows, map the `DUPLICATE_TEMPLATE` code (read from `body.error.code` by the T004 client) to the `ImportTemplates.validation.duplicateKey` pt-BR message and surface it on the form (never a generic failure). (depends on T013, T015)
+- [X] T015 [US2] Add edit-in-place to `import-templates-client.tsx`: open a non-archived template in the shared form (T011) seeded from its current config, save via the update PATCH mutation (config fields only), and invalidate. (depends on T011, T013)
+- [X] T016 [US2] Add the "Criar nova versão" list action in `import-templates-client.tsx`: copy the selected template's config (drop id/createdAt/updatedAt), set `version = nextVersion(list, name)` (editable), open the create form pre-filled, and POST the existing create endpoint. (depends on T013; uses `nextVersion` from T004)
+- [X] T017 [US2] In the create/edit flows, map the `DUPLICATE_TEMPLATE` code (read from `body.error.code` by the T004 client) to the `ImportTemplates.validation.duplicateKey` pt-BR message and surface it on the form (never a generic failure). (depends on T013, T015)
 
 **Checkpoint**: US1 + US2 work. T014 passes.
 

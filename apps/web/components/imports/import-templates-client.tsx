@@ -33,8 +33,11 @@ import { ImportTemplateForm } from "@/components/imports/import-template-form";
 import {
   ImportTemplateError,
   createTemplate,
+  nextVersion,
+  updateTemplate,
   useImportTemplates,
   type ImportTemplateDto,
+  type UpdateTemplateInput,
 } from "@/lib/imports/import-templates-client";
 
 interface CustomerOption {
@@ -49,8 +52,8 @@ async function fetchJson<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** The form dialog can create a new template, or (US2) edit / version an existing one. */
-type FormMode = "create";
+/** The form dialog creates a template, edits one in place, or seeds "criar nova versão". */
+type FormMode = "create" | "edit" | "version";
 
 /**
  * Import Templates administration (slice 012). Lists a selected customer's templates and creates /
@@ -65,6 +68,7 @@ export function ImportTemplatesClient() {
   const [customerId, setCustomerId] = useState<string>("");
   const [includeArchived, setIncludeArchived] = useState(false);
   const [formMode, setFormMode] = useState<FormMode | null>(null);
+  const [selected, setSelected] = useState<ImportTemplateDto | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -92,8 +96,7 @@ export function ImportTemplatesClient() {
   const createMutation = useMutation({
     mutationFn: (input: TemplateConfig) => createTemplate(input),
     onSuccess: () => {
-      setFormMode(null);
-      setFormError(null);
+      closeForm();
       setFeedback(t("created"));
       invalidate();
     },
@@ -101,18 +104,87 @@ export function ImportTemplatesClient() {
       setFormError(mapError(e instanceof ImportTemplateError ? e.code : undefined)),
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateTemplateInput }) =>
+      updateTemplate(id, input),
+    onSuccess: () => {
+      closeForm();
+      setFeedback(t("updated"));
+      invalidate();
+    },
+    onError: (e: Error) =>
+      setFormError(mapError(e instanceof ImportTemplateError ? e.code : undefined)),
+  });
+
   function openCreate() {
+    setSelected(null);
     setFormError(null);
     setFeedback(null);
     setFormMode("create");
   }
 
+  function openEdit(tpl: ImportTemplateDto) {
+    setSelected(tpl);
+    setFormError(null);
+    setFeedback(null);
+    setFormMode("edit");
+  }
+
+  function openVersion(tpl: ImportTemplateDto) {
+    setSelected(tpl);
+    setFormError(null);
+    setFeedback(null);
+    setFormMode("version");
+  }
+
   function closeForm() {
     setFormMode(null);
+    setSelected(null);
     setFormError(null);
   }
 
-  const submitting = createMutation.isPending;
+  function formDefaults(): Partial<TemplateConfig> & { customerId: string } {
+    if (formMode === "edit" && selected) {
+      return {
+        customerId,
+        name: selected.name,
+        version: selected.version,
+        fileType: selected.fileType,
+        columnMappings: selected.columnMappings,
+        parsingRules: selected.parsingRules,
+        requiredOverrides: selected.requiredOverrides,
+      };
+    }
+    if (formMode === "version" && selected) {
+      return {
+        customerId,
+        name: selected.name,
+        version: nextVersion(rows, selected.name),
+        fileType: selected.fileType,
+        columnMappings: selected.columnMappings,
+        parsingRules: selected.parsingRules,
+        requiredOverrides: selected.requiredOverrides,
+      };
+    }
+    return { customerId };
+  }
+
+  function handleFormSubmit(values: TemplateConfig) {
+    if (formMode === "edit" && selected) {
+      updateMutation.mutate({ id: selected.id, input: values });
+    } else {
+      createMutation.mutate(values); // create or "nova versão"
+    }
+  }
+
+  const dialogTitle =
+    formMode === "edit"
+      ? t("editTitle")
+      : formMode === "version"
+        ? t("newVersionTitle")
+        : t("createTitle");
+  const submitLabel = formMode === "edit" ? undefined : t("create");
+  const submitting = createMutation.isPending || updateMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -176,23 +248,29 @@ export function ImportTemplatesClient() {
       {!customerId ? (
         <p className="text-sm text-muted-foreground">{t("selectCustomerPrompt")}</p>
       ) : (
-        <TemplateList query={templatesQuery} rows={rows} />
+        <TemplateList
+          query={templatesQuery}
+          rows={rows}
+          onEdit={openEdit}
+          onVersion={openVersion}
+        />
       )}
 
       <Dialog open={formMode !== null} onOpenChange={(open) => (!open ? closeForm() : null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{t("createTitle")}</DialogTitle>
+            <DialogTitle>{dialogTitle}</DialogTitle>
             <DialogDescription>{t("subtitle")}</DialogDescription>
           </DialogHeader>
-          {formMode === "create" ? (
+          {formMode !== null ? (
             <ImportTemplateForm
-              defaultValues={{ customerId }}
+              key={`${formMode}:${selected?.id ?? "new"}`}
+              defaultValues={formDefaults()}
               submitting={submitting}
               errorMessage={formError}
-              submitLabel={t("create")}
+              submitLabel={submitLabel}
               onCancel={closeForm}
-              onSubmit={(values) => createMutation.mutate(values)}
+              onSubmit={handleFormSubmit}
             />
           ) : null}
         </DialogContent>
@@ -213,9 +291,13 @@ function statusBadge(
 function TemplateList({
   query,
   rows,
+  onEdit,
+  onVersion,
 }: {
   query: ReturnType<typeof useImportTemplates>;
   rows: ImportTemplateDto[];
+  onEdit: (tpl: ImportTemplateDto) => void;
+  onVersion: (tpl: ImportTemplateDto) => void;
 }) {
   const t = useTranslations("ImportTemplates");
 
@@ -231,6 +313,7 @@ function TemplateList({
           <TableHead className="w-24">{t("columnVersion")}</TableHead>
           <TableHead className="w-32">{t("columnFileType")}</TableHead>
           <TableHead className="w-32">{t("columnStatus")}</TableHead>
+          <TableHead className="w-72 text-right">{t("columnActions")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -243,6 +326,21 @@ function TemplateList({
               <TableCell>{tpl.fileType.toUpperCase()}</TableCell>
               <TableCell>
                 <Badge variant={badge.variant}>{badge.label}</Badge>
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {/* Archived templates are read-only (FR-010, enforced in US3). */}
+                  {!tpl.archived ? (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => onEdit(tpl)}>
+                        {t("edit")}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => onVersion(tpl)}>
+                        {t("newVersion")}
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
               </TableCell>
             </TableRow>
           );
