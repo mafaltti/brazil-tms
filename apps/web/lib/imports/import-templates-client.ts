@@ -170,6 +170,23 @@ export function nextVersion(list: { name: string; version: number }[], name: str
   return versions.length === 0 ? 1 : Math.max(...versions) + 1;
 }
 
+/**
+ * Derive the engine-enforced `requiredOverrides` (target field names) from the per-row "Obrigatório"
+ * flags. The import worker enforces required-ness ONLY via `requiredOverrides` (it does not read
+ * `columnMappings[].required`), so the UI checkbox must be projected into this set on save or it has
+ * no effect at import time. Deduplicated; empty/blank targets are skipped.
+ */
+export function deriveRequiredOverrides(
+  mappings: { target?: string; required?: boolean }[],
+): string[] {
+  const set = new Set<string>();
+  for (const mapping of mappings) {
+    const target = mapping.target?.trim();
+    if (mapping.required && target) set.add(target);
+  }
+  return [...set];
+}
+
 /** Non-blocking warning condition (FR-015): a date-kind target is mapped but no date format is set. */
 export function hasDateTargetWithoutFormat(config: {
   columnMappings: { target?: string }[];

@@ -92,8 +92,13 @@ export function ImportTemplatesClient() {
     staleTime: 30_000,
   });
 
-  const templatesQuery = useImportTemplates(customerId, includeArchived);
-  const rows = templatesQuery.data ?? [];
+  // Always fetch the full set (incl. archived) so version suggestions and the last-active count see
+  // archived rows too — the DB unique key (customer, name, version) spans archived rows, and a hidden
+  // archived version would otherwise make a suggested version collide. The "Incluir arquivados" toggle
+  // only controls what the list DISPLAYS.
+  const templatesQuery = useImportTemplates(customerId, true);
+  const allRows = templatesQuery.data ?? [];
+  const rows = includeArchived ? allRows : allRows.filter((r) => !r.archived);
 
   // Prefix invalidation refreshes both this list and the Trip Import selector (shared key prefix).
   function invalidate() {
@@ -165,7 +170,7 @@ export function ImportTemplatesClient() {
       return {
         customerId,
         name: selected.name,
-        version: formMode === "version" ? nextVersion(rows, selected.name) : selected.version,
+        version: formMode === "version" ? nextVersion(allRows, selected.name) : selected.version,
         fileType: selected.fileType,
         columnMappings: selected.columnMappings,
         parsingRules: selected.parsingRules,
@@ -184,7 +189,7 @@ export function ImportTemplatesClient() {
   }
 
   // FR-017: would this deactivate/archive remove the customer's last active (non-archived) template?
-  const activeCount = rows.filter((r) => r.active && !r.archived).length;
+  const activeCount = allRows.filter((r) => r.active && !r.archived).length;
   function isLastActive(tpl: ImportTemplateDto): boolean {
     return tpl.active && !tpl.archived && activeCount === 1;
   }

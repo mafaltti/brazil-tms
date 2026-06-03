@@ -49,9 +49,14 @@ async function apiLogin(
   return request;
 }
 
-/** Open a Radix Select by trigger id and click the option (matches the master-data e2e helper). */
+/** Open a Radix Select by trigger id and click the option (matches the master-data e2e helper). The
+ *  customer triggers are `disabled` until their query loads, so wait for enabled first — on a loaded
+ *  local stack the fetch can take several seconds, and clicking a disabled trigger would otherwise burn
+ *  the test budget. */
 async function selectOptionById(page: Page, triggerId: string, optionName: RegExp | string) {
-  await page.locator(`#${triggerId}`).click();
+  const trigger = page.locator(`#${triggerId}`);
+  await expect(trigger).toBeEnabled({ timeout: 20_000 });
+  await trigger.click();
   await page.getByRole("option", { name: optionName }).click();
 }
 
@@ -219,7 +224,9 @@ test.describe("US2 — review, edit, and version templates", () => {
     await dialog.getByRole("button", { name: "Salvar", exact: true }).click();
 
     await expect(page.getByText("Modelo atualizado com sucesso.")).toBeVisible();
-    // Reopen → the change persisted (refetch).
+    // Wait for the post-save invalidate→refetch to land before reopening, so the row DTO seeding the
+    // form reflects the persisted edit (the form seeds once on open; a stale row would show old data).
+    await page.waitForLoadState("networkidle");
     await row.getByRole("button", { name: "Editar" }).click();
     await expect(page.getByRole("dialog").getByLabel(/coluna do arquivo 1/i)).toHaveValue(
       "orig_col_edited",
@@ -268,6 +275,7 @@ test.describe("US3 — control template availability", () => {
   test("deactivate removes it from the Trip Import selector; reactivate restores it", async ({
     page,
   }) => {
+    test.slow(); // heaviest test: 6 full-page navigations between /admin and /imports.
     await signIn(page, testAccounts.admin);
     await gotoAdmin(page); // DEMO-SHOPEE keeps the seeded template active, so this is not last-active.
 
@@ -354,5 +362,74 @@ test.describe("US3 — control template availability", () => {
     await expect(
       page.getByRole("row", { name: new RegExp(name) }).getByRole("button", { name: "Ativar" }),
     ).toBeVisible();
+  });
+});
+
+test.describe("review fixes — required projection + archived-aware versioning", () => {
+  test("a mapping marked Obrigatório is persisted into requiredOverrides (what the worker enforces)", async ({
+    page,
+    request,
+  }) => {
+    await signIn(page, testAccounts.admin);
+    await gotoAdmin(page);
+
+    const name = uniqueName("E2E-REQ");
+    await page.getByRole("button", { name: PT.new }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel(PT.name, { exact: true }).fill(name);
+    await dialog.getByLabel(/coluna do arquivo 1/i).fill("id_col");
+    await selectTarget(page, 0, "externalTripId");
+    await dialog.getByRole("checkbox").first().check();
+    await dialog.getByRole("button", { name: PT.create }).click();
+    await expect(page.getByText(PT.createdMsg)).toBeVisible();
+
+    // The worker enforces required-ness only via requiredOverrides — assert the checkbox landed there.
+    await apiLogin(request, testAccounts.admin);
+    const customers = await (await request.get("/api/master-data/customers")).json();
+    const demo = customers.items.find(
+      (c: { customerCode: string }) => c.customerCode === "DEMO-SHOPEE",
+    );
+    const list = await (
+      await request.get(`/api/import-templates?customerId=${demo.id}`)
+    ).json();
+    const created = list.items.find((t: { name: string }) => t.name === name);
+    expect(created.requiredOverrides).toContain("externalTripId");
+  });
+
+  test("Criar nova versão skips an archived version number (no duplicate-key collision)", async ({
+    page,
+  }) => {
+    await signIn(page, testAccounts.admin);
+    await gotoAdmin(page);
+
+    const name = uniqueName("E2E-ARCHVER");
+    await createTemplateViaUI(page, { name, version: 1 });
+    await expect(page.getByText(PT.createdMsg)).toBeVisible();
+
+    // Make v2, then archive it (v1 + the seed stay active, so no last-active prompt).
+    await page
+      .getByRole("row", { name: new RegExp(name) })
+      .getByRole("button", { name: "Criar nova versão" })
+      .click();
+    let dialog = page.getByRole("dialog");
+    await expect(dialog.getByLabel(PT.version, { exact: true })).toHaveValue("2");
+    await dialog.getByRole("button", { name: PT.create }).click();
+    await expect(page.getByText(PT.createdMsg)).toBeVisible();
+
+    await page
+      .getByRole("row", { name: new RegExp(name) })
+      .filter({ hasText: "v2" })
+      .getByRole("button", { name: "Arquivar" })
+      .click();
+    await expect(page.getByText("Modelo arquivado.")).toBeVisible();
+
+    // v2 is now archived (hidden by default). A new version off v1 must suggest 3, not the colliding 2.
+    await page
+      .getByRole("row", { name: new RegExp(name) })
+      .filter({ hasText: "v1" })
+      .getByRole("button", { name: "Criar nova versão" })
+      .click();
+    dialog = page.getByRole("dialog");
+    await expect(dialog.getByLabel(PT.version, { exact: true })).toHaveValue("3");
   });
 });

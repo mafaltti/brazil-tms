@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { EntityFormShell, Field } from "@/components/master-data/entity-form";
 import {
+  deriveRequiredOverrides,
   findDuplicateTargets,
   hasDateTargetWithoutFormat,
 } from "@/lib/imports/import-templates-client";
@@ -90,6 +91,18 @@ export function ImportTemplateForm({
   // Once the date-format warning has been surfaced on submit, a second Salvar proceeds (warn-and-allow).
   const [dateWarningAck, setDateWarningAck] = useState(false);
 
+  // The "Obrigatório" checkbox reflects the engine-enforced `requiredOverrides` set (the worker reads
+  // only that, not `columnMappings[].required`). On load, a row is checked if it was flagged required
+  // OR its target is in requiredOverrides; on submit we project the checks back into requiredOverrides.
+  const requiredSet = new Set(defaultValues.requiredOverrides ?? []);
+  const initialMappings =
+    defaultValues.columnMappings && defaultValues.columnMappings.length > 0
+      ? defaultValues.columnMappings.map((m) => ({
+          ...m,
+          required: Boolean(m.required) || (m.target ? requiredSet.has(m.target) : false),
+        }))
+      : [{ source: "", target: "", required: false }];
+
   const {
     register,
     control,
@@ -99,18 +112,18 @@ export function ImportTemplateForm({
   } = useForm<TemplateConfig>({
     resolver: zodResolver(formSchema) as Resolver<TemplateConfig>,
     defaultValues: {
-      name: "",
-      version: 1,
-      fileType: "csv",
-      columnMappings: [{ source: "", target: "", required: false }],
-      parsingRules: {
+      customerId: defaultValues.customerId,
+      name: defaultValues.name ?? "",
+      version: defaultValues.version ?? 1,
+      fileType: defaultValues.fileType ?? "csv",
+      columnMappings: initialMappings,
+      parsingRules: defaultValues.parsingRules ?? {
         dateFormats: [],
         timezone: "America/Sao_Paulo",
         decimalSeparator: ",",
         thousandSeparator: ".",
       },
-      requiredOverrides: [],
-      ...defaultValues,
+      requiredOverrides: defaultValues.requiredOverrides ?? [],
     },
   });
 
@@ -127,10 +140,11 @@ export function ImportTemplateForm({
   }
 
   function onValid(values: TemplateConfig) {
-    // requiredOverrides has no UI editor — preserve whatever the template already had (round-trip).
+    // Project the per-row "Obrigatório" checks into requiredOverrides — the only required-field set the
+    // import worker enforces (it ignores columnMappings[].required). Without this the checkbox is inert.
     const merged: TemplateConfig = {
       ...values,
-      requiredOverrides: defaultValues.requiredOverrides ?? values.requiredOverrides ?? [],
+      requiredOverrides: deriveRequiredOverrides(values.columnMappings),
     };
     // FR-015: non-blocking date-format warning — surface once on submit, then allow proceeding.
     if (hasDateTargetWithoutFormat(merged) && !dateWarningAck) {

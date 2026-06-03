@@ -256,7 +256,8 @@ describe("pt-BR messages", () => {
     const m = messages as {
       ImportTemplates: { confirmations: Record<string, string> };
       Nav: Record<string, string>;
-      Imports: Record<string, string>;
+      // `Imports` holds nested objects (status, match), so its values are not all strings.
+      Imports: Record<string, unknown>;
     };
     expect(m.ImportTemplates.confirmations.lastActiveTemplate).toBeTruthy();
     expect(m.Nav.importTemplates).toBeTruthy();

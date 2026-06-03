@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  deriveRequiredOverrides,
   findDuplicateTargets,
   hasDateTargetWithoutFormat,
   nextVersion,
@@ -58,6 +59,37 @@ describe("nextVersion", () => {
   it("returns 1 when the name has no existing versions", () => {
     expect(nextVersion([{ name: "Outro", version: 2 }], "Novo")).toBe(1);
     expect(nextVersion([], "Qualquer")).toBe(1);
+  });
+});
+
+describe("deriveRequiredOverrides", () => {
+  it("collects the targets of rows flagged required (the only set the worker enforces)", () => {
+    const overrides = deriveRequiredOverrides([
+      { target: "externalTripId", required: true },
+      { target: "originCode", required: false },
+      { target: "destinationCode", required: true },
+    ]);
+    expect(overrides).toEqual(["externalTripId", "destinationCode"]);
+  });
+
+  it("ignores required rows with a blank/missing target and dedupes", () => {
+    expect(
+      deriveRequiredOverrides([
+        { target: "", required: true },
+        { target: "  ", required: true },
+        { target: "originCode", required: true },
+        { target: "originCode", required: true },
+      ]),
+    ).toEqual(["originCode"]);
+  });
+
+  it("returns [] when nothing is flagged required", () => {
+    expect(
+      deriveRequiredOverrides([
+        { target: "externalTripId" },
+        { target: "originCode", required: false },
+      ]),
+    ).toEqual([]);
   });
 });
 
