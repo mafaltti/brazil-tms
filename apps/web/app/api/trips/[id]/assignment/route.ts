@@ -4,6 +4,7 @@ import { requireAuth, requirePermission } from "@/lib/auth/require-auth";
 import { apiError, Conflict, handleRouteError } from "@/lib/api/respond";
 import {
   assignTrip,
+  assertTripExists,
   reassignTrip,
   unassignTrip,
 } from "@/lib/trips/trip-assignments";
@@ -43,6 +44,10 @@ export async function POST(
     ) {
       result = await reassignTrip(id, input, ctx.userId);
     } else {
+      // A missing trip must be 404 NOT_FOUND (contract §1) even on the non-assignable path — verify
+      // existence before the NOT_ASSIGNABLE short-circuit (#11 review). assign/reassign raise NOT_FOUND
+      // themselves via gatherEligibilityContext; this branch never calls them, so check here.
+      await assertTripExists(id);
       throw new Conflict("NOT_ASSIGNABLE", "A viagem precisa ser validada antes de ser atribuída.");
     }
 

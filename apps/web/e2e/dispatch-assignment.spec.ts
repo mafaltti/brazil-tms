@@ -375,5 +375,13 @@ test.describe("US1 — assign & confirm the resources that will run a trip", () 
       const body = (await res.json()) as { error: { code: string } };
       expect(body.error.code).toBe("NOT_ASSIGNABLE");
     }
+
+    // A nonexistent trip must be 404 NOT_FOUND even on the non-assignable path (contract §1, #11 review).
+    const missing = await ctx.post(`/api/trips/00000000-0000-0000-0000-000000000000/assignment`, {
+      data: { driverId, vehicleId, expectedFromStatus: "received" },
+    });
+    expect(missing.status(), "missing trip must be 404 NOT_FOUND").toBe(404);
+    const missingBody = (await missing.json()) as { error: { code: string } };
+    expect(missingBody.error.code).toBe("NOT_FOUND");
   });
 });

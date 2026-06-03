@@ -176,38 +176,47 @@ async function seedSampleTrip(): Promise<void> {
   );
 }
 
-/** A clean OWNED, active demo driver with valid documents (idempotent by name). */
+/**
+ * A clean OWNED, active demo driver with valid documents (idempotent by name). REPAIRS the clean state
+ * (active, un-archived, future license) on re-run so an edited or aged-out demo row cannot block the
+ * DEMO-TRIP-003 assignment via the eligibility evaluator (PR #13 review).
+ */
 async function ensureDemoDriver(): Promise<string> {
+  const clean = { status: "active" as const, licenseExpiry: farFutureDate(), archivedAt: null };
   const existing = await db
     .select({ id: drivers.id })
     .from(drivers)
     .where(eq(drivers.name, DEMO_DRIVER_NAME))
     .limit(1);
-  if (existing[0]) return existing[0].id;
+  if (existing[0]) {
+    await db.update(drivers).set(clean).where(eq(drivers.id, existing[0].id));
+    return existing[0].id;
+  }
   const inserted = await db
     .insert(drivers)
-    .values({ name: DEMO_DRIVER_NAME, ownershipType: "owned", status: "active", licenseExpiry: farFutureDate() })
+    .values({ name: DEMO_DRIVER_NAME, ownershipType: "owned", ...clean })
     .returning({ id: drivers.id });
   return inserted[0]!.id;
 }
 
-/** A clean OWNED, active demo truck with valid documents (idempotent by plate). */
+/**
+ * A clean OWNED, active demo truck with valid documents (idempotent by plate). REPAIRS the clean state
+ * (active, un-archived, future document expiry) on re-run for the same reason as {@link ensureDemoDriver}.
+ */
 async function ensureDemoVehicle(): Promise<string> {
+  const clean = { status: "active" as const, documentExpiry: farFutureDate(), archivedAt: null };
   const existing = await db
     .select({ id: vehicles.id })
     .from(vehicles)
     .where(eq(vehicles.plate, DEMO_PLATE))
     .limit(1);
-  if (existing[0]) return existing[0].id;
+  if (existing[0]) {
+    await db.update(vehicles).set(clean).where(eq(vehicles.id, existing[0].id));
+    return existing[0].id;
+  }
   const inserted = await db
     .insert(vehicles)
-    .values({
-      plate: DEMO_PLATE,
-      vehicleType: "truck",
-      ownershipType: "owned",
-      status: "active",
-      documentExpiry: farFutureDate(),
-    })
+    .values({ plate: DEMO_PLATE, vehicleType: "truck", ownershipType: "owned", ...clean })
     .returning({ id: vehicles.id });
   return inserted[0]!.id;
 }

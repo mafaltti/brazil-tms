@@ -322,6 +322,18 @@ export async function checkAssignment(
   return evaluateAssignmentEligibility(context, DEFAULT_ASSIGNMENT_POLICY);
 }
 
+/**
+ * Existence guard for the BFF's NOT_ASSIGNABLE branch (#11): a missing trip MUST surface as
+ * `NOT_FOUND` (→ 404, contract §1) regardless of the supplied `expectedFromStatus`. The route's
+ * non-assignable short-circuit happens before `assignTrip`/`reassignTrip` (which would otherwise
+ * raise NOT_FOUND via `gatherEligibilityContext`), so the route calls this first. Throws
+ * `Conflict("NOT_FOUND")` when absent; returns void otherwise.
+ */
+export async function assertTripExists(tripId: string): Promise<void> {
+  const rows = await db.select({ id: trips.id }).from(trips).where(eq(trips.id, tripId)).limit(1);
+  if (rows.length === 0) throw new Conflict("NOT_FOUND", "Viagem não encontrada.");
+}
+
 // ---------------------------------------------------------------------------
 // assignTrip — validated → assigned (T027 · contract §1, assign path)
 // ---------------------------------------------------------------------------
