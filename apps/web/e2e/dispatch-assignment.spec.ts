@@ -343,4 +343,45 @@ test.describe("US1 — assign & confirm the resources that will run a trip", () 
       await db.delete(carriers).where(eq(carriers.id, subCarrierId));
     }
   });
+
+  test("assigning a non-assignable trip (received / in_transit) → 409 NOT_ASSIGNABLE (010, #11)", async ({
+    request,
+  }) => {
+    const ctx = await apiLogin(request, testAccounts.opsManager);
+
+    // A `received` and an in-flight trip must be refused with the honest NOT_ASSIGNABLE (not silently
+    // routed into reassignTrip's "reassignment only" ILLEGAL_TRANSITION). The body is otherwise valid
+    // (driver+vehicle) so it reaches the route's by-status branch, not the Zod boundary.
+    for (const status of ["received", "in_transit"] as const) {
+      const inserted = await db
+        .insert(trips)
+        .values({
+          customerId,
+          externalTripId: code(`EXT-${status}`),
+          originLocationId: originId,
+          destinationLocationId: destId,
+          currentStatus: status,
+          originalPlan: { customerId, originLocationId: originId, destinationLocationId: destId },
+          plannedVehicleType: "truck",
+        })
+        .returning({ id: trips.id });
+      const id = inserted[0]!.id;
+      tripIds.push(id);
+
+      const res = await ctx.post(`/api/trips/${id}/assignment`, {
+        data: { driverId, vehicleId, expectedFromStatus: status },
+      });
+      expect(res.status(), `${status} must be 409 NOT_ASSIGNABLE`).toBe(409);
+      const body = (await res.json()) as { error: { code: string } };
+      expect(body.error.code).toBe("NOT_ASSIGNABLE");
+    }
+
+    // A nonexistent trip must be 404 NOT_FOUND even on the non-assignable path (contract §1, #11 review).
+    const missing = await ctx.post(`/api/trips/00000000-0000-0000-0000-000000000000/assignment`, {
+      data: { driverId, vehicleId, expectedFromStatus: "received" },
+    });
+    expect(missing.status(), "missing trip must be 404 NOT_FOUND").toBe(404);
+    const missingBody = (await missing.json()) as { error: { code: string } };
+    expect(missingBody.error.code).toBe("NOT_FOUND");
+  });
 });

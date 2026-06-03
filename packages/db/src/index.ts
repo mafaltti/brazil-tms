@@ -16,6 +16,7 @@ export {
   confirmTripAssignment,
   checkAssignment,
   gatherEligibilityContext,
+  assertTripExists,
 } from "./trips/trip-assignments";
 // `TripAssignmentDto` (+ the extended `TripDetail`) is already re-exported via `export * from
 // "./trips/trip-dto"` above.

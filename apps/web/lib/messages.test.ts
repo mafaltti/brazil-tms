@@ -196,4 +196,31 @@ describe("pt-BR messages", () => {
       expect(view.presets[k]).toBeTruthy();
     }
   });
+
+  // ---- feature 010 — Validate action + NOT_ASSIGNABLE localization (#11) -------------------------
+
+  it("Dispatch.errors has the NOT_ASSIGNABLE label (so the assign error is not REQUEST_FAILED)", () => {
+    const errors = (messages as { Dispatch: { errors: Record<string, string> } }).Dispatch.errors;
+    expect(typeof errors.NOT_ASSIGNABLE).toBe("string");
+    expect(errors.NOT_ASSIGNABLE).not.toBe("");
+  });
+
+  it("Trips.detail has the Validate action keys the ValidateAction component looks up", () => {
+    const d = (messages as { Trips: { detail: Record<string, unknown> } }).Trips.detail;
+    for (const k of [
+      "validateSectionTitle",
+      "validateHint",
+      "validateAction",
+      "rejectAction",
+      "rejectReasonLabel",
+      "rejectReasonPlaceholder",
+      "rejectReasonRequired",
+      "revertHint",
+      "revertToReceived",
+      "validating",
+    ]) {
+      expect(typeof d[k]).toBe("string");
+      expect(d[k]).not.toBe("");
+    }
+  });
 });
