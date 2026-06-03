@@ -68,6 +68,10 @@ Start with two packages (`shared`, `db`); add more only with justification.
 
 <!-- SPECKIT START -->
 Active feature plan: `specs/010-trip-validation-dispatch-fix/plan.md` (Trip Validation Action & Dispatch Queue Hardening).
+Follow-on micro-slice `specs/011-validation-error-reject/plan.md` adds the operator **reject** transition
+`received → validation_error` ("Marcar erro de validação", with a reason carried on the existing `trip_events.notes`
+field) — completing the validate/reject pair, **folded into the same PR #13**, UI-only, adds NOTHING durable, reuses
+`update_trip_status` + the `POST /api/trips/:id/status` endpoint.
 For technologies, project structure, BFF/auth patterns, data model, contracts, and setup/test commands,
 read that plan and its `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`.
 This is a **corrective close-out slice** (slice 010, not one of the nine planned slices) that fixes **GitHub issue #11**:

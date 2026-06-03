@@ -159,6 +159,36 @@ test.describe("010 — Validate a received trip (#11)", () => {
     await expect(page.getByRole("button", { name: "Validar viagem" })).toHaveCount(0);
   });
 
+  test("Ops Manager rejects a received trip → validation_error with the reason on the event (011)", async ({
+    request,
+  }) => {
+    const ctx = await apiLogin(request, testAccounts.opsManager);
+    const tripId = await seedTrip("received");
+
+    const reason = "Destino não reconhecido (teste 011)";
+    const res = await ctx.post(`/api/trips/${tripId}/status`, {
+      data: {
+        expectedFromStatus: "received",
+        toStatus: "validation_error",
+        source: "operator_manual",
+        notes: reason,
+      },
+    });
+    expect(res.status()).toBe(200);
+    const body = (await res.json()) as { item: { currentStatus: string } };
+    expect(body.item.currentStatus).toBe("validation_error");
+
+    // The reject reason is persisted on the append-only status_change event (the existing notes field).
+    const events = await db
+      .select()
+      .from(tripEvents)
+      .where(and(eq(tripEvents.tripId, tripId), eq(tripEvents.eventType, "status_change")));
+    expect(events).toHaveLength(1);
+    expect(events[0]!.statusAfter).toBe("validation_error");
+    expect(events[0]!.notes).toBe(reason);
+    expect(events[0]!.source).toBe("operator_manual");
+  });
+
   test("the validation_error → received correction is available and works", async ({ request }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
     const tripId = await seedTrip("validation_error");
