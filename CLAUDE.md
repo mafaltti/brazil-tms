@@ -67,47 +67,40 @@ Start with two packages (`shared`, `db`); add more only with justification.
 - Code style is enforced by ESLint/Prettier — not by this file. Tests: Vitest + Playwright.
 
 <!-- SPECKIT START -->
-Active feature plan: `specs/010-trip-validation-dispatch-fix/plan.md` (Trip Validation Action & Dispatch Queue Hardening).
-Follow-on micro-slice `specs/011-validation-error-reject/plan.md` adds the operator **reject** transition
-`received → validation_error` ("Marcar erro de validação", with a reason carried on the existing `trip_events.notes`
-field) — completing the validate/reject pair, **folded into the same PR #13**, UI-only, adds NOTHING durable, reuses
-`update_trip_status` + the `POST /api/trips/:id/status` endpoint.
+Active feature plan: `specs/012-import-template-admin/plan.md` (Import Template Administration).
 For technologies, project structure, BFF/auth patterns, data model, contracts, and setup/test commands,
 read that plan and its `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`.
-This is a **corrective close-out slice** (slice 010, not one of the nine planned slices) that fixes **GitHub issue #11**:
-an imported/created trip is always created in **`received`** (003's `createTrip` default; import never transitions — 004),
-but **no shipped product surface advances it to `validated`**, so it can never be assigned through the UI — even though
-`received → validated` is a **legal edge** (`packages/shared/src/domain/trip-status.ts:85`) and `POST /api/trips/:id/status`
-(→ `transitionTripStatus`) already performs it under **`update_trip_status`**. Symptom: the Dispatch Board lists
-non-assignable trips (`scope=active` → all 12 active statuses) and **Atribuir** on a `received` trip dies with a misleading
-**`ILLEGAL_TRANSITION`** because the assignment route routes every non-`validated` `expectedFromStatus` into `reassignTrip`
-(`assignment/route.ts:32-35` → `trip-assignments.ts:471-476`). Freshness is **polling** (no Realtime). It adds **NOTHING
-durable**: **NO new table, enum, migration, permission key, package, worker job, or runtime dependency** (data-model delta
-is *none* — only existing legal edges exercised). Four fixes: **(a) Validate action** — a new small `validate-action.tsx`
-on **Trip Detail** (005) shown only for `received`/`validation_error`, calling the **existing** `/status` endpoint via the
-**reused** generic `useRecordMilestone` hook (source `operator_manual`) — **no new endpoint/service/hook/permission**, and
-per **Constitution III** never re-implements the status machine (`transitionTripStatus` already writes the append-only
-`trip_events` + `audit_logs` + SLA recompute in one tx). **(b) Dispatch queue** — one constant in `dispatch-board.tsx:30`
-goes `assigned=false&scope=active` → **`status=validated&assigned=false`**; the board read model needs **no change**
-(`trip-board.ts` already accepts `status` as `oneOrMany(z.enum(TRIP_STATUSES))`; `trips-read.ts:341-343,356-361` honors it
-and suppresses the active-scope default), and `assigned=false` already excludes `assigned`/`confirmed` (reassign is
-initiated from Trip Detail / Control-Tower, never the board). **(c) Assignment error** — `assignment/route.ts` replaces the
-client-driven ternary with an **explicit by-status branch** (`validated`→assign · `assigned`/`confirmed`→reassign · **else
-→ `Conflict("NOT_ASSIGNABLE", "A viagem precisa ser validada antes da atribuição.")`**) covering **all** non-assignable
-statuses; `Conflict` takes a **free-form string code** (`packages/db/src/errors.ts`) so **no error-type change**; the code
-is added to `assignment-form.tsx` `ERROR_CODES` + a `Dispatch.errors.NOT_ASSIGNABLE` pt-BR label so it does not degrade to
-`REQUEST_FAILED`; `reassignTrip`'s internal guard stays as defense. **(d) Seed** — `trip-domain-sample.ts` advances one
-demo trip → `validated` and one → `assigned` **through the services** (never a raw `UPDATE`), keeping one in `received`, so
-the hardened queue and validate→assign flow are demonstrable/e2e-testable. Authorization adds **NO new key**: validate
-reuses **`update_trip_status`** (Admin/Ops-Manager/Dispatcher/Control-Tower — a superset of the §12.1 "System validation /
-Operations" owner), assignment stays on **`assign_resources`**, board read stays on **`view_all_trips`**. Per
-**Constitution II** nothing is invented: at MVP `received → validated` is a **deliberate operator promotion** (import/004
-already ran the §11.2 checks and does not transition trips). **Out of scope (Future):** auto-validate-on-import (erases the
-§12.1 Warning-review beat; YAGNI), per-customer/rule-driven validation criteria, a `validate_trip` key, bulk validate, and
-a board-level validate action. New work: 1 new UI component + 3 UI edits + 1 route branch + 1 i18n edit + 1 seed edit + 3
-e2e specs (1 new) + the `messages.test.ts` guard; **0** shared-package changes, **0** durable additions. Builds on
-`specs/003-trip-domain-lifecycle/` (the `trip_status` machine, the `received → validated` legal edge, `transitionTripStatus`,
-append-only `trip_events`/`audit_logs`, the demo seed), `specs/005-control-tower/` (the Trip Detail screen the Validate
-action is surfaced on), and `specs/006-dispatch-assignment/` (the Dispatch Board queue + the assignment route/error this
-slice hardens, and the `assign_resources` key). PR base **`dev`**; AI must **not** merge to `main`.
+This is a **corrective close-out slice** (slice 012, not one of the nine planned slices) that completes **CUST-003**
+("configure customer-specific import templates", MVP) — which slice **004** owned but shipped only as a BFF API + worker,
+never a user-facing screen. Today an import template can be created only by a developer (seed/API); every customer without
+a seed shows "Nenhum modelo ativo para este cliente" on Trip Import and cannot import. **This slice is UI-only** and adds
+**NOTHING durable**: **NO new table, column, enum, migration, permission key, package, worker job, or runtime dependency**
+(data-model delta = NONE). It adds an **Import Templates** Administration screen
+(`app/(shell)/admin/import-templates/page.tsx`, guarded by `verifySession` + `can(role,'import_trips')` + redirect) where
+Admin/Operations-Manager create, edit, version, activate/deactivate, and archive a customer's templates, reusing the
+**existing frozen** surface unchanged: the `import_templates` table, the `templateConfigSchema` contract, the recognized
+`MAPPED_*_FIELDS` target sets, the `import_trips` permission, and the endpoints `GET/POST /api/import-templates` +
+`GET/PATCH /api/import-templates/:id` (create/update already write the `import_template.create/.update` audit rows). Key
+design (code-grounded, see `research.md`): a client screen (`components/imports/import-templates-client.tsx`) + a
+react-hook-form form (`import-template-form.tsx`) using `zodResolver(templateConfigSchema)` extended by `.superRefine` for
+the two UI-only rules the backend does NOT enforce — **no duplicate `target`** across mappings and a non-blocking
+**date-target-without-date-format** warning; a **grouped single-select** target picker built from the shared
+`MAPPED_STRING/DATE/NUMBER/JSON_FIELDS` (single source of truth → pt-BR group headers Texto/Data e Hora/Número/Estruturado);
+a dedicated `lib/imports/import-templates-client.ts` (NOT `lib/master-data/client.ts`, which hardcodes
+`/api/master-data/${entity}`); "Criar nova versão" = in-memory copy with `version = max+1` POSTing the existing create
+endpoint; **archived = not editable** and the **last-active-template** warn-and-allow confirm are **client-enforced** (the
+frozen `updateTemplate` has NO `archivedAt` guard and the DTO carries NO optimistic-lock token → last-write-wins).
+Authorization adds **NO new key**: the screen and all actions (incl. archive) reuse **`import_trips`** (= **exactly Admin +
+Operations Manager**, verified in `permissions.ts`/test; Dispatcher does NOT hold it, so the e2e 403/redirect case uses
+Dispatcher) — archive stays on `import_trips` to match the frozen PATCH gate, NOT the Admin-only `delete_archive`.
+Duplicate `(customer,name,version)` maps the existing **`DUPLICATE_TEMPLATE`** 409 to a specific pt-BR message. **Out of
+scope (Future):** auto-detect template from file headers, template import/export, dry-run/preview, bulk ops, a
+`manage_templates` key, un-archive, concurrent-edit locking, a backend archived-edit guard, API/email ingestion, and ANY
+engine/worker/schema/data-model change. New work: 1 new page + 2 new UI components + 1 new client lib + 3 edits (`nav.ts`,
+`trip-import-client.tsx`, `messages/pt-BR.json`) + 1 new e2e spec + 2 unit edits (`import-templates-form.test.ts`,
+`messages.test.ts`); **0** shared/db/worker changes, **0** durable additions. Gated by PRD §29 Input #1: real per-customer
+template **content** sign-off stays **BLOCKED** (sample files); the screen itself ships with documented-default values.
+Builds on `specs/004-trip-import-validation/` (the Import Template entity, config-driven engine, template endpoints, and the
+Trip Import screen + selector this slice feeds) and `001`'s `import_trips` + Administration shell. PR base **`dev`**; AI must
+**not** merge to `main`.
 <!-- SPECKIT END -->
