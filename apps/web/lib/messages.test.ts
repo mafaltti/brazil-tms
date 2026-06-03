@@ -223,4 +223,43 @@ describe("pt-BR messages", () => {
       expect(d[k]).not.toBe("");
     }
   });
+
+  // ---- feature 012 — Import Template Administration localization (FR-014 / SC coverage) -----------
+
+  it("ImportTemplates has the four pt-BR target-kind group headers (FR-003)", () => {
+    const groups = (messages as { ImportTemplates: { fieldGroups: Record<string, string> } })
+      .ImportTemplates.fieldGroups;
+    for (const k of ["text", "dateTime", "number", "structured"]) {
+      expect(typeof groups[k]).toBe("string");
+      expect(groups[k]).not.toBe("");
+    }
+  });
+
+  it("ImportTemplates.validation covers every UI-rule message (none dead)", () => {
+    const v = (messages as { ImportTemplates: { validation: Record<string, string> } })
+      .ImportTemplates.validation;
+    for (const k of [
+      "duplicateKey",
+      "conflictingMapping",
+      "missingDateFormat",
+      "atLeastOneMapping",
+      "incompleteMapping",
+    ]) {
+      expect(typeof v[k]).toBe("string");
+      expect(v[k]).not.toBe("");
+    }
+    // The duplicate-key message must match the server's frozen DUPLICATE_TEMPLATE message exactly.
+    expect(v.duplicateKey).toBe("Já existe um modelo com esse nome e versão.");
+  });
+
+  it("ImportTemplates.confirmations + the Nav/Imports entry points resolve", () => {
+    const m = messages as {
+      ImportTemplates: { confirmations: Record<string, string> };
+      Nav: Record<string, string>;
+      Imports: Record<string, string>;
+    };
+    expect(m.ImportTemplates.confirmations.lastActiveTemplate).toBeTruthy();
+    expect(m.Nav.importTemplates).toBeTruthy();
+    expect(m.Imports.manageTemplates).toBeTruthy();
+  });
 });
