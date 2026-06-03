@@ -130,13 +130,13 @@ deactivating/archiving the last active template shows a pt-BR confirmation and a
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T018 [US3] Extend `apps/web/e2e/import-template-admin.spec.ts` with US3 cases: deactivate → disappears from the `/imports` selector; reactivate → returns; archive → hidden from the active list, visible with "Incluir arquivados", and exposes NO Edit action (read-only); deactivating/archiving a customer's last active template shows the pt-BR last-active confirmation and Prosseguir proceeds. (same file as T014 → after T014)
+- [X] T018 [US3] Extend `apps/web/e2e/import-template-admin.spec.ts` with US3 cases: deactivate → disappears from the `/imports` selector; reactivate → returns; archive → hidden from the active list, visible with "Incluir arquivados", and exposes NO Edit action (read-only); deactivating/archiving a customer's last active template shows the pt-BR last-active confirmation and Prosseguir proceeds. (same file as T014 → after T014)
 
 ### Implementation for User Story 3
 
-- [ ] T019 [US3] Add the activate/deactivate row action to `import-templates-client.tsx` (update PATCH `{ active }`) + invalidate; rely on the existing server-side filter so only `active && !archived` templates appear in the Trip Import selector. (depends on T007, T004)
-- [ ] T020 [US3] Add the archive row action (PATCH `{ archive: true }`) and the `includeArchived` toggle (passed to the list hook) in `import-templates-client.tsx`; enforce **archived = read-only client-side**: for `archived` rows render no Edit/activate/deactivate/archive actions and open a read-only inspection view (the backend has no archived guard). (depends on T007, T015)
-- [ ] T021 [US3] Add the FR-017 last-active warning: a controlled `Dialog` (Cancelar / Prosseguir, pt-BR `confirmations.lastActiveTemplate`) shown before a deactivate or archive that would drop the customer's `active && !archived` count to zero (computed from the loaded list); warn-and-allow (Prosseguir proceeds). Reuse one Dialog for both actions. (depends on T019, T020)
+- [X] T019 [US3] Add the activate/deactivate row action to `import-templates-client.tsx` (update PATCH `{ active }`) + invalidate; rely on the existing server-side filter so only `active && !archived` templates appear in the Trip Import selector. (depends on T007, T004)
+- [X] T020 [US3] Add the archive row action (PATCH `{ archive: true }`) and the `includeArchived` toggle (passed to the list hook) in `import-templates-client.tsx`; enforce **archived = read-only client-side**: for `archived` rows render no Edit/activate/deactivate/archive actions and open a read-only inspection view (the backend has no archived guard). (depends on T007, T015)
+- [X] T021 [US3] Add the FR-017 last-active warning: a controlled `Dialog` (Cancelar / Prosseguir, pt-BR `confirmations.lastActiveTemplate`) shown before a deactivate or archive that would drop the customer's `active && !archived` count to zero (computed from the loaded list); warn-and-allow (Prosseguir proceeds). Reuse one Dialog for both actions. (depends on T019, T020)
 
 **Checkpoint**: All three stories independently functional. T018 passes.
 

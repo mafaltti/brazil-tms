@@ -80,10 +80,22 @@ async function createTemplateViaUI(
   await dialog.getByRole("button", { name: PT.create }).click();
 }
 
-async function gotoAdmin(page: Page): Promise<void> {
+async function gotoAdmin(page: Page, customerCode: RegExp = /DEMO-SHOPEE/): Promise<void> {
   await page.goto("/admin/import-templates");
-  // Select the seeded DEMO-SHOPEE customer.
-  await selectOptionById(page, "template-customer", /DEMO-SHOPEE/);
+  await selectOptionById(page, "template-customer", customerCode);
+}
+
+/** Create an isolated customer via the API (admin holds manage_commercial_data) so the last-active
+ *  flow can be tested deterministically — DEMO-SHOPEE always has the seeded template active. */
+async function apiCreateCustomer(request: APIRequestContext): Promise<{ id: string; code: string }> {
+  await apiLogin(request, testAccounts.admin);
+  const code = `E2E-CUST-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const res = await request.post("/api/master-data/customers", {
+    data: { name: `E2E Cust ${code}`, customerCode: code, contacts: [] },
+  });
+  expect(res.ok()).toBeTruthy();
+  const id = (await res.json()).item.id as string;
+  return { id, code };
 }
 
 test.describe("US1 — authorization", () => {
@@ -249,5 +261,96 @@ test.describe("US2 — review, edit, and version templates", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText("Já existe um modelo com esse nome e versão.")).toBeVisible();
     await expect(dialog).toBeVisible();
+  });
+});
+
+test.describe("US3 — control template availability", () => {
+  test("deactivate removes it from the Trip Import selector; reactivate restores it", async ({
+    page,
+  }) => {
+    await signIn(page, testAccounts.admin);
+    await gotoAdmin(page); // DEMO-SHOPEE keeps the seeded template active, so this is not last-active.
+
+    const name = uniqueName("E2E-LIFE");
+    await createTemplateViaUI(page, { name });
+    await expect(page.getByText(PT.createdMsg)).toBeVisible();
+
+    // Present in the Trip Import selector.
+    await page.goto("/imports");
+    await selectOptionById(page, "import-customer", /DEMO-SHOPEE/);
+    await page.locator("#import-template").click();
+    await expect(page.getByRole("option", { name: new RegExp(name) })).toBeVisible();
+    await page.keyboard.press("Escape");
+
+    // Deactivate from the admin screen.
+    await gotoAdmin(page);
+    const row = page.getByRole("row", { name: new RegExp(name) });
+    await row.getByRole("button", { name: "Desativar" }).click();
+    await expect(page.getByText("Modelo desativado.")).toBeVisible();
+
+    // Gone from the selector.
+    await page.goto("/imports");
+    await selectOptionById(page, "import-customer", /DEMO-SHOPEE/);
+    await page.locator("#import-template").click();
+    await expect(page.getByRole("option", { name: new RegExp(name) })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    // Reactivate → returns to the selector.
+    await gotoAdmin(page);
+    await page.getByRole("row", { name: new RegExp(name) }).getByRole("button", { name: "Ativar" }).click();
+    await expect(page.getByText("Modelo ativado.")).toBeVisible();
+    await page.goto("/imports");
+    await selectOptionById(page, "import-customer", /DEMO-SHOPEE/);
+    await page.locator("#import-template").click();
+    await expect(page.getByRole("option", { name: new RegExp(name) })).toBeVisible();
+  });
+
+  test("archive hides it from the active list; it returns (read-only) with Incluir arquivados", async ({
+    page,
+  }) => {
+    await signIn(page, testAccounts.admin);
+    await gotoAdmin(page);
+
+    const name = uniqueName("E2E-ARCH");
+    await createTemplateViaUI(page, { name });
+    await expect(page.getByText(PT.createdMsg)).toBeVisible();
+
+    await page
+      .getByRole("row", { name: new RegExp(name) })
+      .getByRole("button", { name: "Arquivar" })
+      .click();
+    await expect(page.getByText("Modelo arquivado.")).toBeVisible();
+    await expect(page.getByRole("row", { name: new RegExp(name) })).toHaveCount(0);
+
+    // Visible only with the toggle, and read-only (no Edit; view-only).
+    await page.getByLabel("Incluir arquivados").check();
+    const archivedRow = page.getByRole("row", { name: new RegExp(name) });
+    await expect(archivedRow).toBeVisible();
+    await expect(archivedRow.getByRole("button", { name: "Editar" })).toHaveCount(0);
+    await expect(archivedRow.getByRole("button", { name: "Visualizar" })).toBeVisible();
+  });
+
+  test("deactivating the customer's last active template warns and allows proceed", async ({
+    page,
+    request,
+  }) => {
+    const { code } = await apiCreateCustomer(request);
+    await signIn(page, testAccounts.admin);
+    await gotoAdmin(page, new RegExp(code));
+
+    const name = uniqueName("E2E-LAST");
+    await createTemplateViaUI(page, { name });
+    await expect(page.getByText(PT.createdMsg)).toBeVisible();
+
+    const row = page.getByRole("row", { name: new RegExp(name) });
+    await row.getByRole("button", { name: "Desativar" }).click();
+
+    // The last-active confirmation appears; Prosseguir proceeds (warn-and-allow).
+    await expect(page.getByText(/último modelo ativo deste cliente/i)).toBeVisible();
+    await page.getByRole("button", { name: "Prosseguir" }).click();
+    await expect(page.getByText("Modelo desativado.")).toBeVisible();
+    await expect(
+      page.getByRole("row", { name: new RegExp(name) }).getByRole("button", { name: "Ativar" }),
+    ).toBeVisible();
   });
 });

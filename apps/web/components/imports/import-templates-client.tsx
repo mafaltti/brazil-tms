@@ -11,6 +11,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -52,17 +53,26 @@ async function fetchJson<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-/** The form dialog creates a template, edits one in place, or seeds "criar nova versão". */
-type FormMode = "create" | "edit" | "version";
+/** The form dialog creates a template, edits one in place, seeds "criar nova versão", or shows an
+ *  archived template read-only ("view"). */
+type FormMode = "create" | "edit" | "version" | "view";
+
+/** A deactivate/archive that would leave the customer with zero active templates is confirmed first. */
+type PendingConfirm = { tpl: ImportTemplateDto; kind: "deactivate" | "archive" };
 
 /**
  * Import Templates administration (slice 012). Lists a selected customer's templates and creates /
  * edits / versions / activates / archives them via the EXISTING `/api/import-templates` endpoints.
  * Freshness is TanStack Query polling; NO Realtime. Authorization is enforced by the BFF + the
  * server-component guard (`import_trips`); this screen only composes UI.
+ *
+ * Two rules the frozen backend does NOT enforce are kept client-side: archived templates are read-only
+ * (FR-010 — no edit/lifecycle actions, view-only) and a warn-and-allow confirmation guards an action
+ * that would leave the customer with no active template (FR-017).
  */
 export function ImportTemplatesClient() {
   const t = useTranslations("ImportTemplates");
+  const tCommon = useTranslations("Common");
   const queryClient = useQueryClient();
 
   const [customerId, setCustomerId] = useState<string>("");
@@ -71,6 +81,8 @@ export function ImportTemplatesClient() {
   const [selected, setSelected] = useState<ImportTemplateDto | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<PendingConfirm | null>(null);
 
   // Customers — reuse the master-data query key/endpoint so the cache is shared with Trip Import.
   const customersQuery = useQuery({
@@ -116,6 +128,18 @@ export function ImportTemplatesClient() {
       setFormError(mapError(e instanceof ImportTemplateError ? e.code : undefined)),
   });
 
+  // Lifecycle (activate/deactivate/archive) — distinct from the form's config edits.
+  const statusMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateTemplateInput; successKey: string }) =>
+      updateTemplate(id, input),
+    onSuccess: (_data, vars) => {
+      setFeedback(t(vars.successKey));
+      invalidate();
+    },
+    onError: () => setFeedback(t("actionError")),
+    onSettled: () => setBusyId(null),
+  });
+
   function openCreate() {
     setSelected(null);
     setFormError(null);
@@ -123,18 +147,11 @@ export function ImportTemplatesClient() {
     setFormMode("create");
   }
 
-  function openEdit(tpl: ImportTemplateDto) {
+  function openMode(mode: FormMode, tpl: ImportTemplateDto) {
     setSelected(tpl);
     setFormError(null);
     setFeedback(null);
-    setFormMode("edit");
-  }
-
-  function openVersion(tpl: ImportTemplateDto) {
-    setSelected(tpl);
-    setFormError(null);
-    setFeedback(null);
-    setFormMode("version");
+    setFormMode(mode);
   }
 
   function closeForm() {
@@ -144,22 +161,11 @@ export function ImportTemplatesClient() {
   }
 
   function formDefaults(): Partial<TemplateConfig> & { customerId: string } {
-    if (formMode === "edit" && selected) {
+    if (selected && (formMode === "edit" || formMode === "version")) {
       return {
         customerId,
         name: selected.name,
-        version: selected.version,
-        fileType: selected.fileType,
-        columnMappings: selected.columnMappings,
-        parsingRules: selected.parsingRules,
-        requiredOverrides: selected.requiredOverrides,
-      };
-    }
-    if (formMode === "version" && selected) {
-      return {
-        customerId,
-        name: selected.name,
-        version: nextVersion(rows, selected.name),
+        version: formMode === "version" ? nextVersion(rows, selected.name) : selected.version,
         fileType: selected.fileType,
         columnMappings: selected.columnMappings,
         parsingRules: selected.parsingRules,
@@ -177,12 +183,44 @@ export function ImportTemplatesClient() {
     }
   }
 
+  // FR-017: would this deactivate/archive remove the customer's last active (non-archived) template?
+  const activeCount = rows.filter((r) => r.active && !r.archived).length;
+  function isLastActive(tpl: ImportTemplateDto): boolean {
+    return tpl.active && !tpl.archived && activeCount === 1;
+  }
+
+  function runStatus(tpl: ImportTemplateDto, input: UpdateTemplateInput, successKey: string) {
+    setFeedback(null);
+    setBusyId(tpl.id);
+    statusMutation.mutate({ id: tpl.id, input, successKey });
+  }
+
+  function requestDeactivate(tpl: ImportTemplateDto) {
+    if (isLastActive(tpl)) setConfirm({ tpl, kind: "deactivate" });
+    else runStatus(tpl, { active: false }, "deactivated");
+  }
+
+  function requestArchive(tpl: ImportTemplateDto) {
+    if (isLastActive(tpl)) setConfirm({ tpl, kind: "archive" });
+    else runStatus(tpl, { archive: true }, "archivedMsg");
+  }
+
+  function proceedConfirm() {
+    if (!confirm) return;
+    const { tpl, kind } = confirm;
+    setConfirm(null);
+    if (kind === "deactivate") runStatus(tpl, { active: false }, "deactivated");
+    else runStatus(tpl, { archive: true }, "archivedMsg");
+  }
+
   const dialogTitle =
     formMode === "edit"
       ? t("editTitle")
       : formMode === "version"
         ? t("newVersionTitle")
-        : t("createTitle");
+        : formMode === "view"
+          ? t("viewTitle")
+          : t("createTitle");
   const submitLabel = formMode === "edit" ? undefined : t("create");
   const submitting = createMutation.isPending || updateMutation.isPending;
 
@@ -251,8 +289,13 @@ export function ImportTemplatesClient() {
         <TemplateList
           query={templatesQuery}
           rows={rows}
-          onEdit={openEdit}
-          onVersion={openVersion}
+          busyId={busyId}
+          onEdit={(tpl) => openMode("edit", tpl)}
+          onVersion={(tpl) => openMode("version", tpl)}
+          onView={(tpl) => openMode("view", tpl)}
+          onActivate={(tpl) => runStatus(tpl, { active: true }, "activated")}
+          onDeactivate={requestDeactivate}
+          onArchive={requestArchive}
         />
       )}
 
@@ -262,7 +305,9 @@ export function ImportTemplatesClient() {
             <DialogTitle>{dialogTitle}</DialogTitle>
             <DialogDescription>{t("subtitle")}</DialogDescription>
           </DialogHeader>
-          {formMode !== null ? (
+          {formMode === "view" && selected ? (
+            <ReadOnlyTemplate tpl={selected} onClose={closeForm} />
+          ) : formMode !== null ? (
             <ImportTemplateForm
               key={`${formMode}:${selected?.id ?? "new"}`}
               defaultValues={formDefaults()}
@@ -273,6 +318,22 @@ export function ImportTemplatesClient() {
               onSubmit={handleFormSubmit}
             />
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* FR-017 — last-active warn-and-allow (reused for deactivate + archive). */}
+      <Dialog open={confirm !== null} onOpenChange={(open) => (!open ? setConfirm(null) : null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("confirmTitle")}</DialogTitle>
+            <DialogDescription>{t("confirmations.lastActiveTemplate")}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirm(null)}>
+              {tCommon("cancel")}
+            </Button>
+            <Button onClick={proceedConfirm}>{t("proceed")}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -291,13 +352,23 @@ function statusBadge(
 function TemplateList({
   query,
   rows,
+  busyId,
   onEdit,
   onVersion,
+  onView,
+  onActivate,
+  onDeactivate,
+  onArchive,
 }: {
   query: ReturnType<typeof useImportTemplates>;
   rows: ImportTemplateDto[];
+  busyId: string | null;
   onEdit: (tpl: ImportTemplateDto) => void;
   onVersion: (tpl: ImportTemplateDto) => void;
+  onView: (tpl: ImportTemplateDto) => void;
+  onActivate: (tpl: ImportTemplateDto) => void;
+  onDeactivate: (tpl: ImportTemplateDto) => void;
+  onArchive: (tpl: ImportTemplateDto) => void;
 }) {
   const t = useTranslations("ImportTemplates");
 
@@ -313,12 +384,13 @@ function TemplateList({
           <TableHead className="w-24">{t("columnVersion")}</TableHead>
           <TableHead className="w-32">{t("columnFileType")}</TableHead>
           <TableHead className="w-32">{t("columnStatus")}</TableHead>
-          <TableHead className="w-72 text-right">{t("columnActions")}</TableHead>
+          <TableHead className="text-right">{t("columnActions")}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.map((tpl) => {
           const badge = statusBadge(tpl, t);
+          const busy = busyId === tpl.id;
           return (
             <TableRow key={tpl.id} data-template={tpl.name}>
               <TableCell className="font-medium">{tpl.name}</TableCell>
@@ -329,17 +401,53 @@ function TemplateList({
               </TableCell>
               <TableCell>
                 <div className="flex flex-wrap justify-end gap-2">
-                  {/* Archived templates are read-only (FR-010, enforced in US3). */}
-                  {!tpl.archived ? (
+                  {tpl.archived ? (
+                    // Archived = read-only (FR-010): no edit/lifecycle action, view-only inspection.
+                    <Button size="sm" variant="outline" onClick={() => onView(tpl)}>
+                      {t("view")}
+                    </Button>
+                  ) : (
                     <>
-                      <Button size="sm" variant="outline" onClick={() => onEdit(tpl)}>
+                      <Button size="sm" variant="outline" onClick={() => onEdit(tpl)} disabled={busy}>
                         {t("edit")}
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => onVersion(tpl)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onVersion(tpl)}
+                        disabled={busy}
+                      >
                         {t("newVersion")}
                       </Button>
+                      {tpl.active ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onDeactivate(tpl)}
+                          disabled={busy}
+                        >
+                          {t("deactivate")}
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onActivate(tpl)}
+                          disabled={busy}
+                        >
+                          {t("activate")}
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onArchive(tpl)}
+                        disabled={busy}
+                      >
+                        {t("archive")}
+                      </Button>
                     </>
-                  ) : null}
+                  )}
                 </div>
               </TableCell>
             </TableRow>
@@ -347,5 +455,59 @@ function TemplateList({
         })}
       </TableBody>
     </Table>
+  );
+}
+
+/** Read-only inspection of an archived template (FR-010 — archived is not editable). */
+function ReadOnlyTemplate({ tpl, onClose }: { tpl: ImportTemplateDto; onClose: () => void }) {
+  const t = useTranslations("ImportTemplates");
+  const tCommon = useTranslations("Common");
+  return (
+    <div className="space-y-4 text-sm">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div>
+          <span className="text-muted-foreground">{t("formName")}</span>
+          <p className="font-medium">{tpl.name}</p>
+        </div>
+        <div>
+          <span className="text-muted-foreground">{t("formVersion")}</span>
+          <p className="font-medium">v{tpl.version}</p>
+        </div>
+        <div>
+          <span className="text-muted-foreground">{t("formFileType")}</span>
+          <p className="font-medium">{tpl.fileType.toUpperCase()}</p>
+        </div>
+      </div>
+
+      <div className="space-y-1 rounded-md border p-3">
+        <span className="font-medium">{t("columnMappings")}</span>
+        {tpl.columnMappings.length === 0 ? (
+          <p className="text-muted-foreground">{t("noMappingsYet")}</p>
+        ) : (
+          <ul className="space-y-1">
+            {tpl.columnMappings.map((m, i) => (
+              <li key={i} className="text-muted-foreground">
+                <span className="font-mono">{m.source}</span> → <span className="font-mono">{m.target}</span>
+                {m.required ? ` (${t("requiredFlag")})` : ""}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="rounded-md border p-3">
+        <span className="font-medium">{t("parsingRules")}</span>
+        <p className="text-muted-foreground">
+          {t("dateFormats")}: {tpl.parsingRules.dateFormats.join(", ") || tCommon("none")} ·{" "}
+          {t("timezone")}: {tpl.parsingRules.timezone}
+        </p>
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" onClick={onClose}>
+          {tCommon("close")}
+        </Button>
+      </DialogFooter>
+    </div>
   );
 }
