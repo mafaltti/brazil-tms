@@ -11,12 +11,15 @@ import {
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/trips/:id/assignment — assign **or** reassign resources (006, R9/R11). Requires
- * `assign_resources` (first enforced here). Branches on `expectedFromStatus`: a `validated` trip is
- * **assigned** (`validated → assigned`), an `assigned`/`confirmed` trip is **reassigned** (supersede
- * the current row, no status change). The service runs the server-authoritative eligibility evaluator
+ * POST /api/trips/:id/assignment — assign **or** reassign resources (006, R9/R11; 010, #11). Requires
+ * `assign_resources` (first enforced here). Branches EXPLICITLY on `expectedFromStatus`: a `validated`
+ * trip is **assigned** (`validated → assigned`), an `assigned`/`confirmed` trip is **reassigned**
+ * (supersede the current row, no status change), and **any other status** (received / validation_error
+ * / in-flight / terminal) is rejected with `Conflict("NOT_ASSIGNABLE", …)` → 409 — an honest "must be
+ * validated first" instead of silently misrouting into the reassign path's "reassignment only"
+ * `ILLEGAL_TRANSITION` (the #11 defect). The service runs the server-authoritative eligibility evaluator
  * and may throw `Conflict(INCOMPLETE_ASSIGNMENT | OVERRIDE_REQUIRED | ASSIGNMENT_BLOCKED |
- * STALE_TRANSITION | ILLEGAL_TRANSITION | NOT_FOUND)` → 409 via `handleRouteError` (which surfaces the
+ * STALE_TRANSITION | ILLEGAL_TRANSITION | NOT_ASSIGNABLE | NOT_FOUND)` → 409 via `handleRouteError` (which surfaces the
  * `Finding[]` for OVERRIDE_REQUIRED/ASSIGNMENT_BLOCKED). Returns the trip + any overridden WARN findings.
  */
 export async function POST(
@@ -29,10 +32,19 @@ export async function POST(
     const { id } = await params;
     const input = assignTripSchema.parse(await request.json());
 
-    const result =
-      input.expectedFromStatus === "validated"
-        ? await assignTrip(id, input, ctx.userId)
-        : await reassignTrip(id, input, ctx.userId);
+    // Explicit by-status branch (010, #11): a non-assignable from-status gets an honest
+    // NOT_ASSIGNABLE rather than being silently routed into reassignTrip's "reassignment only" guard.
+    let result: Awaited<ReturnType<typeof assignTrip>>;
+    if (input.expectedFromStatus === "validated") {
+      result = await assignTrip(id, input, ctx.userId);
+    } else if (
+      input.expectedFromStatus === "assigned" ||
+      input.expectedFromStatus === "confirmed"
+    ) {
+      result = await reassignTrip(id, input, ctx.userId);
+    } else {
+      throw new Conflict("NOT_ASSIGNABLE", "A viagem precisa ser validada antes de ser atribuída.");
+    }
 
     return NextResponse.json({ item: result.trip, findings: result.findings });
   } catch (error) {

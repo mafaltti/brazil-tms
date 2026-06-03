@@ -61,6 +61,8 @@ let driverId = "";
 let vehicleId = "";
 let unassignedExternalId = "";
 let unassignedTripId = "";
+let receivedExternalId = "";
+let inTransitExternalId = "";
 const tripIds: string[] = [];
 
 test.beforeAll(async () => {
@@ -109,6 +111,42 @@ test.beforeAll(async () => {
     .returning({ id: trips.id });
   unassignedTripId = trip[0]!.id;
   tripIds.push(unassignedTripId);
+
+  // #11/010: a `received` and an `in_transit` trip on the same window — both must be EXCLUDED from the
+  // dispatch queue (pinned to `status=validated&assigned=false`); only the `validated` trip above shows.
+  receivedExternalId = code("EXT-RECV");
+  const receivedTrip = await db
+    .insert(trips)
+    .values({
+      customerId,
+      externalTripId: receivedExternalId,
+      originLocationId: originId,
+      destinationLocationId: destId,
+      currentStatus: "received",
+      originalPlan: { customerId, originLocationId: originId, destinationLocationId: destId },
+      plannedVehicleType: "truck",
+      plannedPickupWindowStart: todayMidday,
+      plannedDeliveryWindowEnd: new Date(todayMidday.getTime() + 6 * 60 * 60 * 1000),
+    })
+    .returning({ id: trips.id });
+  tripIds.push(receivedTrip[0]!.id);
+
+  inTransitExternalId = code("EXT-INTRANSIT");
+  const inTransitTrip = await db
+    .insert(trips)
+    .values({
+      customerId,
+      externalTripId: inTransitExternalId,
+      originLocationId: originId,
+      destinationLocationId: destId,
+      currentStatus: "in_transit",
+      originalPlan: { customerId, originLocationId: originId, destinationLocationId: destId },
+      plannedVehicleType: "truck",
+      plannedPickupWindowStart: todayMidday,
+      plannedDeliveryWindowEnd: new Date(todayMidday.getTime() + 6 * 60 * 60 * 1000),
+    })
+    .returning({ id: trips.id });
+  tripIds.push(inTransitTrip[0]!.id);
 
   const drv = await db
     .insert(drivers)
@@ -161,6 +199,10 @@ test.describe("US5 — Dispatch Board", () => {
     const tripLink = page.getByRole("link", { name: unassignedExternalId });
     await expect(tripLink).toBeVisible({ timeout: 15_000 });
     await expect(tripLink).toHaveAttribute("href", `/trips/${unassignedTripId}`);
+
+    // #11/010: non-assignable statuses must NOT appear (queue is `status=validated&assigned=false`).
+    await expect(page.getByRole("link", { name: receivedExternalId })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: inTransitExternalId })).toHaveCount(0);
 
     // The per-row assign action ("Atribuir") opens the shared assignment form dialog.
     const row = page.getByRole("listitem").filter({ hasText: unassignedExternalId });

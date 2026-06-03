@@ -20,14 +20,16 @@ import { useTripBoard } from "@/lib/trips/client";
 /**
  * The Dispatch Board (006 US5, §15.6): the dispatcher's daily workspace — the unassigned-by-pickup
  * queue with an inline assign action per trip. It reads the SAME extended board the Control Tower
- * uses, pinned to `assigned=false&scope=active&sort=pickupStart`, so resource availability and
+ * uses, pinned to `status=validated&assigned=false&sort=pickupStart` (only `validated`, unassigned
+ * trips can be assigned from this queue — #11; reassignment is initiated from Trip Detail / the
+ * Control Tower, not here), so resource availability and
  * conflict state reflect the latest poll (30s, built into `useTripBoard` — NO Realtime). Assigning
  * uses the SAME shared `AssignmentForm` (one write path, FR-022); the form surfaces server-authoritative
  * findings as the dispatcher picks. Focused queue — availability is the trip's pickup ordering plus the
  * form's live conflict check, not a separate resource-calendar widget (kept minimal per the brief).
  */
 
-const DISPATCH_QUERY = "assigned=false&scope=active&sort=pickupStart";
+const DISPATCH_QUERY = "status=validated&assigned=false&sort=pickupStart";
 
 export function DispatchBoard({ resourceOptions }: { resourceOptions: TripFilterOptions }) {
   const t = useTranslations("Dispatch");

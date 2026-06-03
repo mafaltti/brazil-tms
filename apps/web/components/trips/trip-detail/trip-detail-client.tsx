@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { TripFilterOptions } from "@brazil-tms/db";
+import type { Role } from "@brazil-tms/shared";
 import { useTripDetail } from "@/lib/trips/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +17,7 @@ import { BillingSection } from "@/components/trips/trip-detail/billing-section";
 import { ExceptionPanel } from "@/components/trips/trip-detail/exception-panel";
 import { SlaIndicator } from "@/components/trips/trip-detail/sla-indicator";
 import { AssignmentPanel } from "@/components/trips/trip-detail/assignment-panel";
+import { ValidateAction } from "@/components/trips/trip-detail/validate-action";
 import { PlanEditForm } from "@/components/trips/plan-edit-form";
 
 /**
@@ -27,9 +29,11 @@ import { PlanEditForm } from "@/components/trips/plan-edit-form";
 export function TripDetailClient({
   id,
   resourceOptions,
+  viewerRole,
 }: {
   id: string;
   resourceOptions: TripFilterOptions;
+  viewerRole: Role;
 }) {
   const t = useTranslations("Trips.detail");
   const tCommon = useTranslations("Common");
@@ -73,6 +77,7 @@ export function TripDetailClient({
       <TripDetailHeader trip={trip} />
       <CustomerPlanSection trip={trip} />
       <PlanEditForm trip={trip} />
+      <ValidateAction trip={trip} viewerRole={viewerRole} />
       <AssignmentPanel trip={trip} resourceOptions={resourceOptions} />
       <SlaIndicator trip={trip} />
       <TimelineSection trip={trip} />

@@ -931,6 +931,12 @@
       "deltaLate": "{minutes} min atrasado",
       "milestoneSuccess": "Marco registrado.",
       "noteSuccess": "Nota adicionada.",
+      "validateSectionTitle": "Validação",
+      "validateHint": "Esta viagem está como Recebida e ainda não pode ser atribuída. Valide-a para liberá-la para a fila de expedição.",
+      "validateAction": "Validar viagem",
+      "revertHint": "Esta viagem está com erro de validação. Após corrigir os dados, retorne-a para Recebida para validar novamente.",
+      "revertToReceived": "Retornar para Recebida",
+      "validating": "Processando...",
       "eventType": {
         "status_change": "Mudança de status",
         "note": "Nota",
@@ -1317,6 +1323,7 @@
       "ASSIGNMENT_BLOCKED": "Há um impedimento que não pode ser ignorado. Ajuste os recursos e tente novamente.",
       "STALE_TRANSITION": "A viagem foi alterada por outra pessoa. Recarregue a página e tente novamente.",
       "ILLEGAL_TRANSITION": "Operação não permitida para o status atual da viagem.",
+      "NOT_ASSIGNABLE": "A viagem precisa ser validada antes de ser atribuída.",
       "NOT_FOUND": "Viagem não encontrada.",
       "VALIDATION": "Verifique os campos destacados.",
       "REQUEST_FAILED": "Não foi possível concluir a operação. Tente novamente."

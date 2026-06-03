@@ -23,5 +23,11 @@ export default async function TripDetailPage({
 
   const { id } = await params;
   const resourceOptions = await getTripFilterOptions();
-  return <TripDetailClient id={id} resourceOptions={resourceOptions} />;
+  return (
+    <TripDetailClient
+      id={id}
+      resourceOptions={resourceOptions}
+      viewerRole={session.user.role}
+    />
+  );
 }
