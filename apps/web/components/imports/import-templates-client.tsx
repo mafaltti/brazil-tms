@@ -1,11 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
+import type { TemplateConfig } from "@brazil-tms/shared";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -21,7 +29,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ImportTemplateForm } from "@/components/imports/import-template-form";
 import {
+  ImportTemplateError,
+  createTemplate,
   useImportTemplates,
   type ImportTemplateDto,
 } from "@/lib/imports/import-templates-client";
@@ -38,17 +49,24 @@ async function fetchJson<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** The form dialog can create a new template, or (US2) edit / version an existing one. */
+type FormMode = "create";
+
 /**
- * Import Templates administration (slice 012). Lists a selected customer's templates and (per story)
- * creates / edits / versions / activates / archives them via the EXISTING `/api/import-templates`
- * endpoints. Freshness is TanStack Query polling; NO Realtime. Authorization is enforced by the BFF +
- * the server-component guard (`import_trips`); this screen only composes UI.
+ * Import Templates administration (slice 012). Lists a selected customer's templates and creates /
+ * edits / versions / activates / archives them via the EXISTING `/api/import-templates` endpoints.
+ * Freshness is TanStack Query polling; NO Realtime. Authorization is enforced by the BFF + the
+ * server-component guard (`import_trips`); this screen only composes UI.
  */
 export function ImportTemplatesClient() {
   const t = useTranslations("ImportTemplates");
+  const queryClient = useQueryClient();
 
   const [customerId, setCustomerId] = useState<string>("");
   const [includeArchived, setIncludeArchived] = useState(false);
+  const [formMode, setFormMode] = useState<FormMode | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   // Customers — reuse the master-data query key/endpoint so the cache is shared with Trip Import.
   const customersQuery = useQuery({
@@ -61,6 +79,41 @@ export function ImportTemplatesClient() {
   const templatesQuery = useImportTemplates(customerId, includeArchived);
   const rows = templatesQuery.data ?? [];
 
+  // Prefix invalidation refreshes both this list and the Trip Import selector (shared key prefix).
+  function invalidate() {
+    void queryClient.invalidateQueries({ queryKey: ["import-templates"] });
+  }
+
+  function mapError(code: string | undefined): string {
+    if (code === "DUPLICATE_TEMPLATE") return t("validation.duplicateKey");
+    return t("saveError");
+  }
+
+  const createMutation = useMutation({
+    mutationFn: (input: TemplateConfig) => createTemplate(input),
+    onSuccess: () => {
+      setFormMode(null);
+      setFormError(null);
+      setFeedback(t("created"));
+      invalidate();
+    },
+    onError: (e: Error) =>
+      setFormError(mapError(e instanceof ImportTemplateError ? e.code : undefined)),
+  });
+
+  function openCreate() {
+    setFormError(null);
+    setFeedback(null);
+    setFormMode("create");
+  }
+
+  function closeForm() {
+    setFormMode(null);
+    setFormError(null);
+  }
+
+  const submitting = createMutation.isPending;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -68,7 +121,9 @@ export function ImportTemplatesClient() {
           <h1 className="text-2xl font-semibold">{t("title")}</h1>
           <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
-        <Button disabled={!customerId}>{t("new")}</Button>
+        <Button disabled={!customerId} onClick={openCreate}>
+          {t("new")}
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-end gap-4">
@@ -76,7 +131,10 @@ export function ImportTemplatesClient() {
           <Label htmlFor="template-customer">{t("customer")}</Label>
           <Select
             value={customerId}
-            onValueChange={setCustomerId}
+            onValueChange={(value) => {
+              setCustomerId(value);
+              setFeedback(null);
+            }}
             disabled={customersQuery.isLoading}
           >
             <SelectTrigger id="template-customer" className="w-72">
@@ -109,11 +167,36 @@ export function ImportTemplatesClient() {
         </label>
       </div>
 
+      {feedback ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {feedback}
+        </p>
+      ) : null}
+
       {!customerId ? (
         <p className="text-sm text-muted-foreground">{t("selectCustomerPrompt")}</p>
       ) : (
         <TemplateList query={templatesQuery} rows={rows} />
       )}
+
+      <Dialog open={formMode !== null} onOpenChange={(open) => (!open ? closeForm() : null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{t("createTitle")}</DialogTitle>
+            <DialogDescription>{t("subtitle")}</DialogDescription>
+          </DialogHeader>
+          {formMode === "create" ? (
+            <ImportTemplateForm
+              defaultValues={{ customerId }}
+              submitting={submitting}
+              errorMessage={formError}
+              submitLabel={t("create")}
+              onCancel={closeForm}
+              onSubmit={(values) => createMutation.mutate(values)}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
