@@ -288,9 +288,11 @@ test.describe("US3 — control template availability", () => {
     await row.getByRole("button", { name: "Desativar" }).click();
     await expect(page.getByText("Modelo desativado.")).toBeVisible();
 
-    // Gone from the selector.
+    // Gone from the selector. Wait for the templates fetch to settle so the count-0 assertion is not
+    // a false pass against a still-loading (momentarily empty) list.
     await page.goto("/imports");
     await selectOptionById(page, "import-customer", /DEMO-SHOPEE/);
+    await page.waitForLoadState("networkidle");
     await page.locator("#import-template").click();
     await expect(page.getByRole("option", { name: new RegExp(name) })).toHaveCount(0);
     await page.keyboard.press("Escape");
