@@ -88,8 +88,8 @@ key is introduced; archive is **not** gated by the Admin-only `delete_archive`. 
 
 > **Use `dispatcher@` (or `finance@`) for the negative authz checks** (§5.0): they lack `import_trips`,
 > so the nav item is hidden, direct navigation to `/admin/import-templates` **redirects to `/`**, and the
-> API returns **403**. (Note: the `nav.ts` comment that once listed Dispatcher under import-trips is
-> stale — `permissions.ts` is authoritative: Admin + Ops Manager only.) **Control Tower** and **Executive
+> API returns **403**. (`permissions.ts` is authoritative: `import_trips` = Admin + Operations Manager
+> only; Dispatcher does **not** hold it.) **Control Tower** and **Executive
 > Viewer** also lack the key but aren't seeded as accounts — change a user's role in `/admin/users` to
 > exercise them, or rely on `packages/shared/src/auth/permissions.test.ts`.
 
@@ -222,7 +222,10 @@ button on the Trip Import screen (`/imports`).
 ### 5.4 Audit (SC-006)
 Every create/edit/state-change is attributable to the acting user via the **existing** import-template
 audit actions (`import_template.create` / `import_template.update`, written by the frozen service). View
-them in **`/admin/audit`** (Admin), filtered to the `import_template` entity type.
+them in **`/admin/audit`** (Admin): there is **no dedicated `import_template` entity-type preset** (the
+presets are Viagens/Exceções/Documentos/Cobrança/Exportações/Usuários), so filter via the **Ação**
+dropdown — **"Modelo de importação criado" / "Modelo de importação atualizado"** — or search by the
+template's id in the entity-id field. The rows also appear in the unfiltered global audit log.
 
 ### 5.5 Cross-link (FR-011)
 From **`/imports`**, the **"Gerenciar modelos"** button jumps to `/admin/import-templates`; from
