@@ -372,9 +372,14 @@ export function TripImportClient() {
           <h1 className="text-2xl font-semibold">{t("title")}</h1>
           <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/imports/history">{t("historyLink")}</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href="/admin/import-templates">{t("manageTemplates")}</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/imports/history">{t("historyLink")}</Link>
+          </Button>
+        </div>
       </div>
 
       {/* Upload form */}

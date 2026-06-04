@@ -8,6 +8,7 @@ import {
   Building2,
   Container,
   Factory,
+  FileCog,
   History,
   LayoutDashboard,
   MapPin,
@@ -35,6 +36,7 @@ const ICONS: Record<string, LucideIcon> = {
   Truck,
   Container,
   Factory,
+  FileCog,
   Upload,
   History,
 };

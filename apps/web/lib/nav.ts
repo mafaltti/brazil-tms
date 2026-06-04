@@ -45,9 +45,11 @@ export const NAV_ITEMS: readonly NavItem[] = [
     icon: "ListChecks",
     permission: "manage_commercial_data",
   },
-  // 004 — trip import (import_trips: Admin, Ops Manager, Dispatcher).
+  // 004 — trip import (import_trips: Admin, Ops Manager).
   { key: "imports", href: "/imports", icon: "Upload", permission: "import_trips" },
   { key: "importHistory", href: "/imports/history", icon: "History", permission: "import_trips" },
+  // 012 — import template administration (import_trips: Admin, Ops Manager).
+  { key: "importTemplates", href: "/admin/import-templates", icon: "FileCog", permission: "import_trips" },
   // 002 — fleet master data (manage_fleet_data: Admin, Ops Manager, Fleet Coordinator).
   { key: "drivers", href: "/resources/drivers", icon: "UserRound", permission: "manage_fleet_data" },
   { key: "vehicles", href: "/resources/vehicles", icon: "Truck", permission: "manage_fleet_data" },
