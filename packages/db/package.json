@@ -25,7 +25,8 @@
     "db:seed:sla-rules": "tsx ./seed/sla-rules.ts",
     "db:seed:document-types": "tsx ./seed/document-types.ts",
     "db:seed:rates": "tsx ./seed/rates.ts",
-    "db:seed:buckets": "tsx ./seed/storage-buckets.ts"
+    "db:seed:buckets": "tsx ./seed/storage-buckets.ts",
+    "db:seed:all": "pnpm run db:seed:master-data && pnpm run db:seed:reason-codes && pnpm run db:seed:document-types && pnpm run db:seed:sla-rules && pnpm run db:seed:rates && pnpm run db:seed:import && pnpm run db:seed && pnpm run db:seed:trip-domain && pnpm run db:seed:buckets"
   },
   "dependencies": {
     "@brazil-tms/shared": "workspace:*",
