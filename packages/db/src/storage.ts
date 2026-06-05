@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { StorageClient } from "@supabase/storage-js";
 
 /**
  * Supabase Storage helper (feature 004, research R12). Server/worker-only — uses the service-role key
@@ -12,10 +12,22 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * too. The web side re-applies the server-only guard at its re-export boundary.
  */
 
-let cachedClient: SupabaseClient | undefined;
+let cachedStorage: StorageClient | undefined;
 
-function getClient(): SupabaseClient {
-  if (cachedClient) return cachedClient;
+/**
+ * Build the Storage client DIRECTLY via `@supabase/storage-js` — NOT through supabase-js `createClient`.
+ * The full client also constructs a `RealtimeClient`, whose constructor eagerly probes for a global
+ * `WebSocket` and THROWS on plain Node < 22 ("Node.js 20 detected without native WebSocket support…").
+ * The import worker (and the `tsx` seeds) run as plain Node, so that probe broke Trip Import; the
+ * web/BFF only escaped it because Next.js exposes a `WebSocket` global. Realtime is forbidden anyway
+ * (Constitution: freshness is polling, never Realtime), so we never want that client. `StorageClient`
+ * builds no auth/realtime/postgrest clients, needs no WebSocket, and works on any Node version.
+ *
+ * URL + auth headers mirror exactly how supabase-js wires its `.storage`: base `<url>/storage/v1`, with
+ * the service-role key sent as both `apikey` and `Authorization: Bearer` (what its `fetchWithAuth` adds).
+ */
+function getStorage(): StorageClient {
+  if (cachedStorage) return cachedStorage;
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) {
@@ -23,10 +35,11 @@ function getClient(): SupabaseClient {
       "Supabase Storage requires SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY (server/worker-only).",
     );
   }
-  cachedClient = createClient(url, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
+  cachedStorage = new StorageClient(new URL("storage/v1", url).href, {
+    apikey: serviceRoleKey,
+    Authorization: `Bearer ${serviceRoleKey}`,
   });
-  return cachedClient;
+  return cachedStorage;
 }
 
 /** The private bucket name (default `imports`; overridable via IMPORT_BUCKET). */
@@ -70,8 +83,8 @@ async function putObject(
   contentType: string,
   bucket: string = importBucket(),
 ): Promise<string> {
-  const { error } = await getClient()
-    .storage.from(bucket)
+  const { error } = await getStorage()
+    .from(bucket)
     .upload(key, bytes, { contentType, upsert: true });
   if (error) throw new Error(`Storage upload failed for ${key}: ${error.message}`);
   return key;
@@ -82,9 +95,9 @@ async function putObject(
  * the `imports` bucket is set up; safe to re-run (a "already exists" error is swallowed).
  */
 export async function ensureBucket(name: string): Promise<void> {
-  const { data } = await getClient().storage.getBucket(name);
+  const { data } = await getStorage().getBucket(name);
   if (data) return;
-  const { error } = await getClient().storage.createBucket(name, { public: false });
+  const { error } = await getStorage().createBucket(name, { public: false });
   // Treat an "already exists" race as success.
   if (error && !/exist/i.test(error.message)) {
     throw new Error(`Storage bucket create failed for ${name}: ${error.message}`);
@@ -113,7 +126,7 @@ export async function putExport(
  * insert fails). Swallows errors so cleanup never masks the original failure. */
 export async function removeObject(key: string, bucket: string): Promise<void> {
   try {
-    await getClient().storage.from(bucket).remove([key]);
+    await getStorage().from(bucket).remove([key]);
   } catch {
     // best-effort: leave the orphan rather than throw over the real error.
   }
@@ -139,7 +152,7 @@ export async function putErrorReport(
 
 /** Download an object by key (the worker parse job reads the original). Bucket defaults to `imports`. */
 export async function downloadObject(key: string, bucket: string = importBucket()): Promise<Buffer> {
-  const { data, error } = await getClient().storage.from(bucket).download(key);
+  const { data, error } = await getStorage().from(bucket).download(key);
   if (error || !data) throw new Error(`Storage download failed for ${key}: ${error?.message ?? "no data"}`);
   return Buffer.from(await data.arrayBuffer());
 }
@@ -150,8 +163,8 @@ export async function signedUrl(
   expiresInSeconds: number,
   bucket: string = importBucket(),
 ): Promise<string> {
-  const { data, error } = await getClient()
-    .storage.from(bucket)
+  const { data, error } = await getStorage()
+    .from(bucket)
     .createSignedUrl(key, expiresInSeconds);
   if (error || !data) throw new Error(`Storage signed URL failed for ${key}: ${error?.message ?? "no data"}`);
   return data.signedUrl;

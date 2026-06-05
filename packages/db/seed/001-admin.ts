@@ -1,7 +1,7 @@
 import "dotenv/config";
-import { createClient } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
 import { db, users } from "../src";
+import { createSeedAdminClient } from "./_no-realtime";
 
 /**
  * Bootstrap the first Admin so the system can create everyone else (research §14).
@@ -29,9 +29,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const admin = createClient(url, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const admin = createSeedAdminClient(url, serviceRoleKey);
 
   const existingProfile = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (existingProfile[0]) {

@@ -1,7 +1,7 @@
 import "dotenv/config";
-import { createClient } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
 import { appRole, db, users } from "../src";
+import { createSeedAdminClient } from "./_no-realtime";
 
 /**
  * Provision the accounts the Playwright e2e suite expects (apps/web/e2e/test-config defaults).
@@ -40,9 +40,7 @@ const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !serviceRoleKey) {
   throw new Error("NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL) and SUPABASE_SERVICE_ROLE_KEY are required.");
 }
-const admin = createClient(url, serviceRoleKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+const admin = createSeedAdminClient(url, serviceRoleKey);
 
 async function ensureAuthUser(email: string, password: string): Promise<string> {
   const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
