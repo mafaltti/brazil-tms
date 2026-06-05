@@ -2,12 +2,7 @@ import { parse as parseCsv } from "csv-parse/sync";
 import ExcelJS from "exceljs";
 import type { PgBoss } from "pg-boss";
 import { and, eq } from "drizzle-orm";
-import {
-  db,
-  importBatches,
-  importRows,
-  importTemplates,
-} from "@brazil-tms/db";
+import { db, importBatches, importRows, importTemplates } from "@brazil-tms/db";
 import { downloadObject } from "@brazil-tms/db/storage";
 import {
   applyTemplate,
@@ -15,11 +10,7 @@ import {
   type ParsePayload,
   type TemplateConfig,
 } from "@brazil-tms/shared";
-import {
-  setBatchFailed,
-  setBatchStatus,
-  setBatchTotalRows,
-} from "../../lib/batch-progress";
+import { setBatchFailed, setBatchStatus, setBatchTotalRows } from "../../lib/batch-progress";
 import { JOB, enqueue, work } from "../../lib/queue";
 
 /**
@@ -38,7 +29,7 @@ import { JOB, enqueue, work } from "../../lib/queue";
  * parser itself throws) is an unrecoverable batch failure → `failed` (original file retained).
  */
 
-interface ParsedRecord {
+export interface ParsedRecord {
   rowNumber: number;
   raw: Record<string, string>;
 }
@@ -67,9 +58,16 @@ function parseCsvBytes(bytes: Buffer): ParsedRecord[] {
 }
 
 /** Stringify an ExcelJS cell value to the same string shape the engine expects from CSV. */
-function cellToString(value: ExcelJS.CellValue): string {
+export function cellToString(value: ExcelJS.CellValue): string {
   if (value === null || value === undefined) return "";
-  if (value instanceof Date) return value.toISOString();
+  if (value instanceof Date) {
+    // ExcelJS hands typed date cells back as JS `Date`s whose UTC fields hold the spreadsheet's
+    // wall-clock (Excel stores dates as zone-less serials; `excelToDate` is pure UTC math, so this is
+    // machine-timezone independent). Emit a ZONE-LESS ISO datetime (drop the trailing `Z`) so the
+    // engine's `normalizeDate` interprets that wall-clock in the TEMPLATE timezone — matching what the
+    // operator sees in Excel — instead of forcing a typed cell back through a locale date format.
+    return value.toISOString().replace(/Z$/, "");
+  }
   if (typeof value === "object") {
     const obj = value as unknown as Record<string, unknown>;
     // ExcelJS rich-text / hyperlink / formula result shapes.
@@ -84,7 +82,7 @@ function cellToString(value: ExcelJS.CellValue): string {
 }
 
 /** XLSX → records from the first worksheet; row 1 = headers, data rows numbered 1-based. */
-async function parseXlsxBytes(bytes: Buffer): Promise<ParsedRecord[]> {
+export async function parseXlsxBytes(bytes: Buffer): Promise<ParsedRecord[]> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(bytes as unknown as ArrayBuffer);
   const sheet = workbook.worksheets[0];
@@ -162,10 +160,7 @@ export async function runParse(payload: ParsePayload): Promise<void> {
   let records: ParsedRecord[];
   try {
     const bytes = await downloadObject(storageKey);
-    records =
-      template.fileType === "xlsx"
-        ? await parseXlsxBytes(bytes)
-        : parseCsvBytes(bytes);
+    records = template.fileType === "xlsx" ? await parseXlsxBytes(bytes) : parseCsvBytes(bytes);
   } catch (err) {
     await setBatchFailed(
       batchId,

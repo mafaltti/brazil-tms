@@ -1,10 +1,6 @@
 import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
-import {
-  parsingRulesSchema,
-  templateConfigSchema,
-  type TemplateConfig,
-} from "../schemas/import";
+import { parsingRulesSchema, templateConfigSchema, type TemplateConfig } from "../schemas/import";
 import { applyTemplate } from "./engine";
 import { detectInFileCollisions } from "./matching";
 import { normalizeDate, normalizeNumber } from "./normalize";
@@ -50,9 +46,7 @@ describe("applyTemplate (config-driven mapping)", () => {
     })
       .toUTC()
       .toISO();
-    expect(row.plannedPickupWindowStart?.toISOString()).toBe(
-      new Date(expectedUtc!).toISOString(),
-    );
+    expect(row.plannedPickupWindowStart?.toISOString()).toBe(new Date(expectedUtc!).toISOString());
   });
 
   it("leaves unmapped targets null and treats blank cells as null", () => {
@@ -79,6 +73,16 @@ describe("applyTemplate (config-driven mapping)", () => {
     const row = applyTemplate({ "ID Viagem": "  ABC-123  " }, template);
     expect(row.externalTripId).toBe("ABC-123");
   });
+
+  it("maps an xlsx-style ISO datetime cell to the correct UTC instant via the ISO fallback", () => {
+    // The worker emits a zone-less ISO datetime for typed Excel date cells; the engine must accept it
+    // even though the template's configured format is the Brazilian `dd/MM/yyyy HH:mm`.
+    const row = applyTemplate(
+      { "ID Viagem": "ABC-123", Coleta: "2026-06-07T15:00:00.000" },
+      template,
+    );
+    expect(row.plannedPickupWindowStart?.toISOString()).toBe("2026-06-07T18:00:00.000Z");
+  });
 });
 
 describe("normalizeDate (explicit Luxon parsing)", () => {
@@ -102,6 +106,24 @@ describe("normalizeDate (explicit Luxon parsing)", () => {
   it("throws when dateFormats is empty (no implicit Date fallback)", () => {
     const emptyRules = parsingRulesSchema.parse({});
     expect(() => normalizeDate("01/02/2026 08:00", emptyRules)).toThrow(/UNPARSEABLE_DATE/);
+  });
+
+  // xlsx typed date cells reach the engine as an ISO datetime (the worker's `cellToString`), NOT in the
+  // operator's `dd/MM/yyyy` format. A ZONE-LESS ISO is the spreadsheet wall-clock → interpret in zone.
+  it("accepts a zone-less ISO datetime, interpreting the wall-clock in the template zone (15:00 → 18:00Z)", () => {
+    const result = normalizeDate("2026-06-07T15:00:00.000", rules);
+    expect(result.toISOString()).toBe("2026-06-07T18:00:00.000Z");
+    // even with NO matching configured format, the ISO fallback still applies:
+    const emptyRules = parsingRulesSchema.parse({});
+    expect(normalizeDate("2026-06-07T15:00:00.000", emptyRules).toISOString()).toBe(
+      "2026-06-07T18:00:00.000Z",
+    );
+  });
+
+  it("honors an explicit offset/Z in an ISO datetime as an absolute instant (15:00Z → 15:00Z)", () => {
+    expect(normalizeDate("2026-06-07T15:00:00.000Z", rules).toISOString()).toBe(
+      "2026-06-07T15:00:00.000Z",
+    );
   });
 });
 

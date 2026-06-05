@@ -16,10 +16,18 @@ function escapeRegExp(literal: string): string {
 }
 
 /**
- * Parse a raw cell into a UTC instant using ONLY the template's configured formats.
- * Trims first; empty or no-format-matches throws. The matched DateTime is interpreted in the
- * template timezone (so "01/02/2026 08:00" in America/Sao_Paulo yields the correct UTC instant)
- * and converted to a UTC JS Date for storage.
+ * Parse a raw cell into a UTC instant. Trims first; empty or no-match throws. Two recognized shapes,
+ * tried in order — both interpret a zone-less wall-clock in the template timezone (so "01/02/2026
+ * 08:00" in America/Sao_Paulo yields the correct UTC instant) and store a UTC JS Date:
+ *
+ *  1. The template's configured Luxon formats — the CSV path: the operator-typed text format the cells
+ *     literally hold (e.g. "dd/MM/yyyy HH:mm").
+ *  2. An ISO-8601 *datetime* fallback (value contains a 'T'). xlsx typed date cells carry NO format —
+ *     ExcelJS hands them back as JS `Date`s and the worker's `cellToString` emits a canonical ISO
+ *     datetime. A ZONE-LESS ISO ("2026-06-07T15:00:00.000") is interpreted in the template timezone, so
+ *     the wall-clock the user sees in Excel keeps its meaning; an ISO carrying an explicit offset/`Z`
+ *     is honored as an absolute instant. ISO-8601 is unambiguous, so this stays within the "explicit,
+ *     never an implicit `new Date()`" contract — a bare date with no time (no 'T') still throws.
  */
 export function normalizeDate(value: string, rules: ParsingRules): Date {
   const trimmed = value.trim();
@@ -32,7 +40,13 @@ export function normalizeDate(value: string, rules: ParsingRules): Date {
       return dt.toUTC().toJSDate();
     }
   }
-  // No configured format matched (or dateFormats is empty). Never fall back to implicit parsing.
+  if (trimmed.includes("T")) {
+    const iso = DateTime.fromISO(trimmed, { zone: rules.timezone });
+    if (iso.isValid) {
+      return iso.toUTC().toJSDate();
+    }
+  }
+  // No configured format matched and not an ISO datetime. Never fall back to implicit parsing.
   throw new Error(`UNPARSEABLE_DATE: ${value}`);
 }
 
