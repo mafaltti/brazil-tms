@@ -162,6 +162,9 @@ importers:
       '@brazil-tms/shared':
         specifier: workspace:*
         version: link:../shared
+      '@supabase/storage-js':
+        specifier: ^2.45.0
+        version: 2.106.2
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.106.2
