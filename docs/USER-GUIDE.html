@@ -2046,7 +2046,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 </ul>
 <div class="callout info">
 <p class="callout-title">Where you use them</p>
-<p>On the <strong>Importações</strong> screen (<code>/imports</code>) you select a customer and the import template before uploading the file — the template is what turns "their messy spreadsheet" into "clean trips" in our system. Templates are managed by <span class="badge">Admin</span> and <span class="badge">Operations Manager</span>.</p>
+<p>Today, imports apply a single built-in <strong>standard format</strong> to every file: on the <strong>Importações</strong> screen (<code>/imports</code>) you just pick a customer and upload — there's no template to choose (a <em>provisional</em> notice on the screen says so). The per-customer template mechanism described above is kept in the system for future signed-off customer formats; it isn't part of the normal import flow yet.</p>
 </div>
 
 <h3>7. User management — who can sign in, and as what</h3>
@@ -2194,7 +2194,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 </ul>
 <div class="callout info">
 <p class="callout-title">Onde você os usa</p>
-<p>Na tela <strong>Importações</strong> (<code>/imports</code>) você seleciona o cliente e o modelo de importação antes de enviar o arquivo — é o modelo que transforma "a planilha bagunçada deles" em "viagens limpas" no nosso sistema. Os modelos são gerenciados por <span class="badge">Administrador</span> e <span class="badge">Gerente de Operações</span>.</p>
+<p>Hoje, a importação aplica um único <strong>formato padrão</strong> embutido a todo arquivo: na tela <strong>Importações</strong> (<code>/imports</code>) você apenas escolhe o cliente e envia — não há modelo para selecionar (um aviso de <em>provisório</em> na tela indica isso). O mecanismo de modelos por cliente descrito acima é mantido no sistema para formatos de clientes homologados no futuro; ainda não faz parte do fluxo normal de importação.</p>
 </div>
 
 <h3>7. Gestão de usuários — quem pode entrar, e como o quê</h3>
@@ -2237,7 +2237,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <dl class="glossary">
 <dt>Trip <span class="pt">viagem</span></dt><dd>One planned transport movement between two places — for example, a truck going from a customer's warehouse to a sorting center. Each row in the customer's file becomes one trip.</dd>
 <dt>Customer <span class="pt">cliente</span></dt><dd>The company that sends you trips to carry (Shopee, DHL eCommerce, Mercado Livre, etc.). Every trip belongs to exactly one customer.</dd>
-<dt>Template <span class="pt">modelo de importação</span></dt><dd>A saved "translation guide" for one customer's file. Each customer names its columns differently; the template tells the system which column in <em>their</em> file means "pickup date," "destination," and so on. The system has one import engine and many templates — one per customer file format.</dd>
+<dt>Standard import format <span class="pt">formato de importação padrão</span></dt><dd>A single built-in recipe that maps the expected file columns onto the app's trip fields. It's applied to every import automatically and is the same for all customers — you don't pick or configure anything. It's a documented default, marked <em>provisional</em> until a customer's real format is signed off.</dd>
 <dt>External trip ID <span class="pt">ID externo da viagem</span></dt><dd>The trip's own identifier <em>in the customer's system</em> (their tracking number for it). This is how the system recognizes the same trip if the customer sends it again.</dd>
 <dt>Import batch <span class="pt">lote de importação</span></dt><dd>The permanent record of one file upload: which file, who uploaded it, when, and how many trips were created, updated, duplicated, or errored.</dd>
 <dt>Location <span class="pt">local</span></dt><dd>A pickup or delivery place (a warehouse, hub, or sorting center) that already exists in the system's master data.</dd>
@@ -2251,9 +2251,8 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <h3>Step by step: importing a customer file</h3>
 <p>Open <strong>Importações</strong> (<code>/imports</code>) and find the "Novo arquivo" (New file) panel.</p>
 <ol class="steps">
-<li><strong>Choose the customer.</strong> Pick whose trips you're importing from the <strong>Cliente</strong> (Customer) dropdown. This matters because the system uses the customer to find the right template and to look up the correct locations.</li>
-<li><strong>Pick the template.</strong> Choose the customer's <strong>Modelo de importação</strong> (import template). If no active template exists for that customer yet, you'll see "Nenhum modelo ativo para este cliente" — an Admin or Ops Manager must configure one first. The template is what lets the system understand that customer's specific file layout.</li>
-<li><strong>Upload the file.</strong> Choose the file in the <strong>Arquivo</strong> (File) field. Accepted formats are <code>.csv</code> and <code>.xlsx</code> only ("Formatos aceitos: .csv ou .xlsx"). Click <strong>Importar</strong> (Import).</li>
+<li><strong>Choose the customer.</strong> Pick whose trips you're importing from the <strong>Cliente</strong> (Customer) dropdown. This matters because the system uses the customer to look up the correct locations.</li>
+<li><strong>Upload the file.</strong> Choose the file in the <strong>Arquivo</strong> (File) field — accepted formats are <code>.csv</code> and <code>.xlsx</code> only ("Formatos aceitos: .csv ou .xlsx"). There is <em>no template to choose</em>: every file is read with one built-in <strong>standard format</strong> (a documented default, marked <em>provisional</em> by the notice at the top of the screen). Not sure which columns to use? Click <strong>Baixar modelo (.csv)</strong> for a ready-to-fill sample, or <strong>Ver formato esperado</strong> to see the expected columns. Then click <strong>Importar</strong> (Import).</li>
 <li><strong>Wait while it processes.</strong> Large files are read and checked in the background, so the screen never freezes — you can even navigate away and come back. The <strong>Andamento</strong> (Progress) area shows the batch moving through stages: <em>Recebido</em> (received) → <em>Lendo arquivo</em> (reading file) → <em>Validando</em> (validating) → <em>Validado</em> (validated). The screen refreshes itself automatically.</li>
 <li><strong>Read the preview and the summary.</strong> When validation finishes, the <strong>Prévia e validação</strong> (Preview and validation) table shows every row, its outcome, and any notes. Above it, a summary line counts the four results: <strong>Novas</strong> (new), <strong>Atualizadas</strong> (updated), <strong>Duplicadas</strong> (duplicate), and <strong>Erros</strong> (errors).</li>
 <li><strong>Fix what needs fixing.</strong> Error rows must be resolved before they can become trips (more on this below). You can correct the source file and re-upload, or map an unknown location right on the screen.</li>
@@ -2320,7 +2319,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <dl class="glossary">
 <dt>Viagem <span class="pt">trip</span></dt><dd>Um deslocamento de transporte planejado entre dois lugares — por exemplo, um caminhão indo do armazém de um cliente até um centro de triagem. Cada linha do arquivo do cliente vira uma viagem.</dd>
 <dt>Cliente <span class="pt">customer</span></dt><dd>A empresa que lhe envia viagens para transportar (Shopee, DHL eCommerce, Mercado Livre, etc.). Toda viagem pertence a exatamente um cliente.</dd>
-<dt>Modelo de importação <span class="pt">template</span></dt><dd>Um "guia de tradução" salvo para o arquivo de um cliente. Cada cliente nomeia suas colunas de um jeito; o modelo diz ao sistema qual coluna do arquivo <em>dele</em> significa "data de coleta", "destino" e assim por diante. O sistema tem um único motor de importação e vários modelos — um por formato de arquivo de cliente.</dd>
+<dt>Formato de importação padrão <span class="pt">standard import format</span></dt><dd>Uma única receita embutida que mapeia as colunas esperadas do arquivo para os campos de viagem do app. É aplicada a toda importação automaticamente e é igual para todos os clientes — você não escolhe nem configura nada. É um padrão documentado, marcado como <em>provisório</em> até que o formato real de um cliente seja homologado.</dd>
 <dt>ID externo da viagem <span class="pt">external trip ID</span></dt><dd>O identificador da viagem <em>no sistema do cliente</em> (o número de rastreio dele para ela). É assim que o sistema reconhece a mesma viagem se o cliente enviá-la de novo.</dd>
 <dt>Lote de importação <span class="pt">import batch</span></dt><dd>O registro permanente de um envio de arquivo: qual arquivo, quem enviou, quando, e quantas viagens foram criadas, atualizadas, duplicadas ou com erro.</dd>
 <dt>Local <span class="pt">location</span></dt><dd>Um ponto de coleta ou entrega (armazém, hub ou centro de triagem) que já existe no cadastro do sistema.</dd>
@@ -2334,9 +2333,8 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <h3>Passo a passo: importando um arquivo de cliente</h3>
 <p>Abra <strong>Importações</strong> (<code>/imports</code>) e localize o painel "Novo arquivo".</p>
 <ol class="steps">
-<li><strong>Escolha o cliente.</strong> Selecione de quem são as viagens na lista <strong>Cliente</strong>. Isso importa porque o sistema usa o cliente para achar o modelo certo e localizar os locais corretos.</li>
-<li><strong>Selecione o modelo.</strong> Escolha o <strong>Modelo de importação</strong> do cliente. Se ainda não houver modelo ativo para esse cliente, aparecerá "Nenhum modelo ativo para este cliente" — um Administrador ou Gerente de Operações precisa configurar um antes. O modelo é o que permite ao sistema entender o layout específico do arquivo daquele cliente.</li>
-<li><strong>Envie o arquivo.</strong> Escolha o arquivo no campo <strong>Arquivo</strong>. Os formatos aceitos são apenas <code>.csv</code> e <code>.xlsx</code> ("Formatos aceitos: .csv ou .xlsx"). Clique em <strong>Importar</strong>.</li>
+<li><strong>Escolha o cliente.</strong> Selecione de quem são as viagens na lista <strong>Cliente</strong>. Isso importa porque o sistema usa o cliente para localizar os locais corretos.</li>
+<li><strong>Envie o arquivo.</strong> Escolha o arquivo no campo <strong>Arquivo</strong> — os formatos aceitos são apenas <code>.csv</code> e <code>.xlsx</code> ("Formatos aceitos: .csv ou .xlsx"). <em>Não há modelo para escolher</em>: todo arquivo é lido com um único <strong>formato padrão</strong> embutido (um padrão documentado, marcado como <em>provisório</em> pelo aviso no topo da tela). Não tem certeza de quais colunas usar? Clique em <strong>Baixar modelo (.csv)</strong> para um exemplo pronto para preencher, ou em <strong>Ver formato esperado</strong> para ver as colunas esperadas. Depois clique em <strong>Importar</strong>.</li>
 <li><strong>Aguarde o processamento.</strong> Arquivos grandes são lidos e verificados em segundo plano, então a tela nunca trava — você pode até sair e voltar depois. A área <strong>Andamento</strong> mostra o lote passando pelas etapas: <em>Recebido</em> → <em>Lendo arquivo</em> → <em>Validando</em> → <em>Validado</em>. A tela se atualiza sozinha.</li>
 <li><strong>Leia a prévia e o resumo.</strong> Quando a validação termina, a tabela <strong>Prévia e validação</strong> mostra cada linha, seu resultado e eventuais observações. Acima dela, uma linha de resumo conta os quatro resultados: <strong>Novas</strong>, <strong>Atualizadas</strong>, <strong>Duplicadas</strong> e <strong>Erros</strong>.</li>
 <li><strong>Corrija o que precisar.</strong> As linhas com erro precisam ser resolvidas antes de virarem viagens (mais sobre isso abaixo). Você pode corrigir o arquivo de origem e reenviar, ou mapear um local não reconhecido ali mesmo na tela.</li>
@@ -4404,11 +4402,6 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <td>On <em>Importações</em>, use <strong>Exportar erros</strong>, fix the file, and import again. A "Possível duplicata" needs a person to confirm (with a reason) before it's created.</td>
 </tr>
 <tr>
-<td>Import has no template to choose.</td>
-<td>"Nenhum modelo ativo para este cliente." — that customer has no active import template yet.</td>
-<td>Ask an Admin to configure the customer's import template before importing.</td>
-</tr>
-<tr>
 <td>Assignment is blocked at the Dispatch board.</td>
 <td>A hard conflict (for example, resource already booked, expired documentation, wrong vehicle type).</td>
 <td>Adjust the resources to clear the block. For non-blocking warnings, a permitted user can enter a "Motivo da exceção" to proceed.</td>
@@ -4583,11 +4576,6 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <td>Uma linha da importação está marcada com erro.</td>
 <td>Um campo obrigatório está faltando ou inválido, ou a linha é uma possível duplicata.</td>
 <td>Em <em>Importações</em>, use <strong>Exportar erros</strong>, corrija o arquivo e importe novamente. Uma "Possível duplicata" precisa que uma pessoa confirme (com um motivo) antes de ser criada.</td>
-</tr>
-<tr>
-<td>A importação não tem modelo para escolher.</td>
-<td>"Nenhum modelo ativo para este cliente." — aquele cliente ainda não tem modelo de importação ativo.</td>
-<td>Peça a um Administrador para configurar o modelo de importação do cliente antes de importar.</td>
 </tr>
 <tr>
 <td>A atribuição está bloqueada na Expedição.</td>
