@@ -619,7 +619,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 
 <dl class="glossary">
 <dt>Status <span class="pt">Status</span></dt>
-<dd>Where a trip sits in its lifecycle — for example Received, Validated, Assigned, In Transit, Completed, Billed, or Cancelled <span class="pt">(Recebida, Validada, Atribuída, Em trânsito, Concluída, Faturada, Cancelada)</span>. Status can only move along allowed steps; the trip's main status is separate from its SLA status and its billing status.</dd>
+<dd>Where a trip sits in its lifecycle — for example Received, Assigned, In Transit, Completed, Billed, or Cancelled <span class="pt">(Recebida, Atribuída, Em trânsito, Concluída, Faturada, Cancelada)</span>. Status can only move along allowed steps; the trip's main status is separate from its SLA status and its billing status.</dd>
 
 <dt>Audit log / Audit trail <span class="pt">Auditoria</span></dt>
 <dd>A permanent, can't-be-edited history of important actions — who changed what, when, and the before/after values. Admins view it at <code>/admin/audit</code>; a trip's own history also appears on its detail page.</dd>
@@ -801,7 +801,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 
 <dl class="glossary">
 <dt>Status <span class="pt">Status</span></dt>
-<dd>Em que ponto do ciclo de vida a viagem está — por exemplo Recebida, Validada, Atribuída, Em trânsito, Concluída, Faturada ou Cancelada. O status só pode avançar pelos passos permitidos; o status principal da viagem é separado do risco de SLA e do faturamento.</dd>
+<dd>Em que ponto do ciclo de vida a viagem está — por exemplo Recebida, Atribuída, Em trânsito, Concluída, Faturada ou Cancelada. O status só pode avançar pelos passos permitidos; o status principal da viagem é separado do risco de SLA e do faturamento.</dd>
 
 <dt>Audit log / Audit trail <span class="pt">Auditoria</span></dt>
 <dd>Um histórico permanente e que não pode ser editado das ações importantes — quem alterou o quê, quando, e os valores antes/depois. O Administrador consulta em <code>/admin/audit</code>; o histórico da própria viagem também aparece na página de detalhe dela.</dd>
@@ -1321,9 +1321,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <div class="table-wrap"><table class="data">
 <thead><tr><th>Status</th><th>What it means (everyday words)</th><th>Who usually owns it</th></tr></thead>
 <tbody>
-<tr><td><span class="pill is-neutral">Received</span> <span class="badge">Recebida</span></td><td>The trip just arrived — typed in by hand. Nothing has been checked yet. (Imported trips skip this and arrive <em>Validada</em>.)</td><td>Operations</td></tr>
-<tr><td><span class="pill is-bad">Validation Error</span> <span class="badge">Erro de validação</span></td><td>The system found a blocking problem in the data (e.g. an unknown location or a missing required field). The trip cannot move forward until someone fixes it.</td><td>Operations</td></tr>
-<tr><td><span class="pill is-neutral">Validated</span> <span class="badge">Validada</span></td><td>The data is complete and clean enough to execute. The trip is ready to be assigned to people and equipment.</td><td>Operations</td></tr>
+<tr><td><span class="pill is-neutral">Received</span> <span class="badge">Recebida</span></td><td>The trip has arrived — created by hand or from an import — and is ready to be assigned. This is the first status, and trips can be dispatched directly from here.</td><td>Operations</td></tr>
 <tr><td><span class="pill is-neutral">Assigned</span> <span class="badge">Atribuída</span></td><td>A driver, vehicle, and/or carrier (a hired outside transport company) have been picked for the trip on the <a href="/dispatch">Dispatch</a> board.</td><td>Dispatcher</td></tr>
 <tr><td><span class="pill is-neutral">Confirmed</span> <span class="badge">Confirmada</span></td><td>The assignment is locked in and ready to run. Everyone agrees the trip will happen as planned.</td><td>Dispatcher</td></tr>
 <tr><td><span class="pill is-neutral">At Origin</span> <span class="badge">Na origem</span></td><td>The vehicle has arrived at the pickup location.</td><td>Control Tower</td></tr>
@@ -1348,15 +1346,15 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <p>A trip can't jump around freely. The system enforces a fixed map of legal moves — think of a board game where each square tells you the only squares you may move to next. If you try an illegal move (for example, jumping straight from <strong>Received</strong> to <strong>In Transit</strong>), the system refuses it and the status stays exactly where it was. Here are the rules that matter most, in plain language:</p>
 
 <div class="cards">
-<div class="card"><h4>You move forward, not randomly backward</h4><p>The normal happy path is Received → Validated → Assigned → Confirmed → At Origin → In Transit → At Destination → Unloaded → Completed → Billing Pending → Billing Ready → Billed. You generally can't leap backward to an arbitrary earlier step.</p></div>
-<div class="card"><h4>A couple of safe back-steps exist</h4><p>If validation fails, a trip in <strong>Validation Error</strong> goes back to <strong>Received</strong> after correction. And a trip that was <strong>Assigned</strong> can be "unassigned" back to <strong>Validated</strong> if the dispatcher needs to redo the resources.</p></div>
+<div class="card"><h4>You move forward, not randomly backward</h4><p>The normal happy path is Received → Assigned → Confirmed → At Origin → In Transit → At Destination → Unloaded → Completed → Billing Pending → Billing Ready → Billed. You generally can't leap backward to an arbitrary earlier step.</p></div>
+<div class="card"><h4>A safe back-step exists</h4><p>A trip that was <strong>Assigned</strong> can be "unassigned" back to <strong>Received</strong> if the dispatcher needs to redo the resources. The prior assignment is kept as history.</p></div>
 <div class="card"><h4>Loading and Unloading are optional</h4><p>You may record them, or skip them. So <strong>At Origin → In Transit</strong> (skipping Loading) and <strong>At Destination → Unloaded</strong> (skipping Unloading) are both perfectly valid.</p></div>
 <div class="card"><h4>Cancelled needs a reason</h4><p>Cancelling isn't a one-click action — it requires a full justification (see below) and is allowed only before the trip reaches <strong>Completed</strong>. After that, the trip closes as Completed or moves to Disputed instead.</p></div>
 <div class="card"><h4>Disputed remembers where it came from</h4><p>When a trip enters <strong>Disputed</strong>, the system records the status it left. When the dispute is resolved, the trip can return to that exact status (or be Cancelled). So a dispute is a pause, not a reset.</p></div>
 <div class="card"><h4>Dead ends are final</h4><p><strong>Cancelled</strong> is terminal — no further moves. <strong>Billed</strong> is effectively the end of the line too, with one escape hatch: it can still be pulled into <strong>Disputed</strong> if a billing problem surfaces later.</p></div>
 </div>
 
-<div class="callout info"><p class="callout-title">"Warning" is not a status</p><p>During import a trip can be flagged with a <strong>warning</strong> — something that needs a human glance but doesn't block progress. A warning is just a sticky note on a Received or Validated trip; it is <em>not</em> a status of its own and never stops the trip from moving on.</p></div>
+<div class="callout info"><p class="callout-title">"Warning" is not a status</p><p>During import a trip can be flagged with a <strong>warning</strong> — something that needs a human glance but doesn't block progress. A warning is just a sticky note on a Received trip; it is <em>not</em> a status of its own and never stops the trip from moving on.</p></div>
 
 <h4>Cancelling a trip the right way</h4>
 <p>Because a cancellation has money and customer-relationship consequences, the system insists on a complete story before it accepts one. If any piece is missing, the cancellation is rejected and the trip stays put. To cancel, the user must supply <strong>all</strong> of:</p>
@@ -1415,9 +1413,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <div class="table-wrap"><table class="data">
 <thead><tr><th>Status</th><th>O que significa (em palavras do dia a dia)</th><th>Quem normalmente cuida</th></tr></thead>
 <tbody>
-<tr><td><span class="pill is-neutral">Recebida</span></td><td>A viagem acabou de chegar — digitada à mão. Nada foi verificado ainda. (Viagens importadas pulam esta etapa e já entram como <em>Validada</em>.)</td><td>Gerente de Operações</td></tr>
-<tr><td><span class="pill is-bad">Erro de validação</span></td><td>O sistema encontrou um problema bloqueante nos dados (ex.: um local desconhecido ou um campo obrigatório em falta). A viagem não avança até alguém corrigir.</td><td>Gerente de Operações</td></tr>
-<tr><td><span class="pill is-neutral">Validada</span></td><td>Os dados estão completos e limpos o suficiente para executar. A viagem está pronta para receber pessoas e equipamentos.</td><td>Gerente de Operações</td></tr>
+<tr><td><span class="pill is-neutral">Recebida</span></td><td>A viagem chegou — digitada à mão ou criada por importação — e está pronta para ser atribuída. É o primeiro status, e as viagens podem ser despachadas direto a partir daqui.</td><td>Gerente de Operações</td></tr>
 <tr><td><span class="pill is-neutral">Atribuída</span></td><td>Um motorista, veículo e/ou transportadora (empresa de transporte contratada por fora) foram escolhidos para a viagem no quadro de <a href="/dispatch">Expedição</a>.</td><td>Despachante</td></tr>
 <tr><td><span class="pill is-neutral">Confirmada</span></td><td>A atribuição está travada e pronta para rodar. Todos concordam que a viagem vai acontecer como planejado.</td><td>Despachante</td></tr>
 <tr><td><span class="pill is-neutral">Na origem</span></td><td>O veículo chegou ao local de coleta.</td><td>Torre de Controle</td></tr>
@@ -1442,15 +1438,15 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <p>Uma viagem não pode pular de qualquer jeito. O sistema impõe um mapa fixo de movimentos válidos — pense num jogo de tabuleiro em que cada casa diz para quais casas você pode ir em seguida. Se você tentar um movimento inválido (por exemplo, pular direto de <strong>Recebida</strong> para <strong>Em trânsito</strong>), o sistema recusa e o status permanece exatamente onde estava. Aqui estão as regras mais importantes, em linguagem simples:</p>
 
 <div class="cards">
-<div class="card"><h4>Você avança, não volta aleatoriamente</h4><p>O caminho normal é Recebida → Validada → Atribuída → Confirmada → Na origem → Em trânsito → No destino → Descarregada → Concluída → Faturamento pendente → Pronta p/ faturar → Faturada. Em geral não dá para saltar para trás para uma etapa anterior qualquer.</p></div>
-<div class="card"><h4>Existem alguns retornos seguros</h4><p>Se a validação falhar, uma viagem em <strong>Erro de validação</strong> volta para <strong>Recebida</strong> após a correção. E uma viagem <strong>Atribuída</strong> pode ter a atribuição removida, voltando para <strong>Validada</strong>, se o despachante precisar refazer os recursos.</p></div>
+<div class="card"><h4>Você avança, não volta aleatoriamente</h4><p>O caminho normal é Recebida → Atribuída → Confirmada → Na origem → Em trânsito → No destino → Descarregada → Concluída → Faturamento pendente → Pronta p/ faturar → Faturada. Em geral não dá para saltar para trás para uma etapa anterior qualquer.</p></div>
+<div class="card"><h4>Existe um retorno seguro</h4><p>Uma viagem <strong>Atribuída</strong> pode ter a atribuição removida, voltando para <strong>Recebida</strong>, se o despachante precisar refazer os recursos. A atribuição anterior é mantida no histórico.</p></div>
 <div class="card"><h4>Carregando e Descarregando são opcionais</h4><p>Você pode registrá-los ou pular. Então <strong>Na origem → Em trânsito</strong> (pulando Carregando) e <strong>No destino → Descarregada</strong> (pulando Descarregando) são perfeitamente válidos.</p></div>
 <div class="card"><h4>Cancelar exige um motivo</h4><p>Cancelar não é uma ação de um clique — exige uma justificativa completa (veja abaixo) e só é permitido antes de a viagem chegar a <strong>Concluída</strong>. Depois disso, a viagem encerra como Concluída ou vai para Em disputa.</p></div>
 <div class="card"><h4>Em disputa lembra de onde veio</h4><p>Quando uma viagem entra em <strong>Em disputa</strong>, o sistema registra o status que ela deixou. Quando a disputa é resolvida, a viagem pode voltar a esse status exato (ou ser Cancelada). Ou seja, uma disputa é uma pausa, não um reinício.</p></div>
 <div class="card"><h4>Becos sem saída são finais</h4><p><strong>Cancelada</strong> é terminal — sem movimentos seguintes. <strong>Faturada</strong> é, na prática, o fim da linha também, com uma única saída de emergência: ainda pode ir para <strong>Em disputa</strong> se um problema de cobrança aparecer depois.</p></div>
 </div>
 
-<div class="callout info"><p class="callout-title">"Alerta" não é um status</p><p>Durante a importação, uma viagem pode receber um <strong>alerta</strong> — algo que pede um olhar humano, mas não bloqueia o avanço. Um alerta é só um bilhete colado numa viagem Recebida ou Validada; <em>não</em> é um status próprio e nunca impede a viagem de seguir.</p></div>
+<div class="callout info"><p class="callout-title">"Alerta" não é um status</p><p>Durante a importação, uma viagem pode receber um <strong>alerta</strong> — algo que pede um olhar humano, mas não bloqueia o avanço. Um alerta é só um bilhete colado numa viagem Recebida; <em>não</em> é um status próprio e nunca impede a viagem de seguir.</p></div>
 
 <h4>Cancelando uma viagem do jeito certo</h4>
 <p>Como um cancelamento tem consequências de dinheiro e de relacionamento com o cliente, o sistema exige uma história completa antes de aceitá-lo. Se qualquer parte faltar, o cancelamento é recusado e a viagem fica parada. Para cancelar, você precisa informar <strong>todos</strong> os itens a seguir:</p>
@@ -2256,7 +2252,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <li><strong>Wait while it processes.</strong> Large files are read and checked in the background, so the screen never freezes — you can even navigate away and come back. The <strong>Andamento</strong> (Progress) area shows the batch moving through stages: <em>Recebido</em> (received) → <em>Lendo arquivo</em> (reading file) → <em>Validando</em> (validating) → <em>Validado</em> (validated). The screen refreshes itself automatically.</li>
 <li><strong>Read the preview and the summary.</strong> When validation finishes, the <strong>Prévia e validação</strong> (Preview and validation) table shows every row, its outcome, and any notes. Above it, a summary line counts the four results: <strong>Novas</strong> (new), <strong>Atualizadas</strong> (updated), <strong>Duplicadas</strong> (duplicate), and <strong>Erros</strong> (errors).</li>
 <li><strong>Fix what needs fixing.</strong> Error rows must be resolved before they can become trips (more on this below). You can correct the source file and re-upload, or map an unknown location right on the screen.</li>
-<li><strong>Confirm.</strong> When you're happy, click <strong>Confirmar importação</strong> (Confirm import). The system creates or updates the trips and finalizes the import batch. You'll see "Importação concluída com sucesso" (Import completed successfully). Newly created trips land in <strong>Validada</strong> (Validated) status, ready to be assigned.</li>
+<li><strong>Confirm.</strong> When you're happy, click <strong>Confirmar importação</strong> (Confirm import). The system creates or updates the trips and finalizes the import batch. You'll see "Importação concluída com sucesso" (Import completed successfully). Newly created trips land in <strong>Recebida</strong> (Received) status, ready to be assigned.</li>
 </ol>
 
 <div class="callout tip"><p class="callout-title">Nothing is created until you confirm</p><p>Uploading and validating only <em>previews</em> what would happen. No trip exists until you click <strong>Confirmar importação</strong>. So you can safely upload a file just to see how clean it is, review the counts, and decide whether to proceed.</p></div>
@@ -2338,7 +2334,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <li><strong>Aguarde o processamento.</strong> Arquivos grandes são lidos e verificados em segundo plano, então a tela nunca trava — você pode até sair e voltar depois. A área <strong>Andamento</strong> mostra o lote passando pelas etapas: <em>Recebido</em> → <em>Lendo arquivo</em> → <em>Validando</em> → <em>Validado</em>. A tela se atualiza sozinha.</li>
 <li><strong>Leia a prévia e o resumo.</strong> Quando a validação termina, a tabela <strong>Prévia e validação</strong> mostra cada linha, seu resultado e eventuais observações. Acima dela, uma linha de resumo conta os quatro resultados: <strong>Novas</strong>, <strong>Atualizadas</strong>, <strong>Duplicadas</strong> e <strong>Erros</strong>.</li>
 <li><strong>Corrija o que precisar.</strong> As linhas com erro precisam ser resolvidas antes de virarem viagens (mais sobre isso abaixo). Você pode corrigir o arquivo de origem e reenviar, ou mapear um local não reconhecido ali mesmo na tela.</li>
-<li><strong>Confirme.</strong> Quando estiver satisfeito, clique em <strong>Confirmar importação</strong>. O sistema cria ou atualiza as viagens e finaliza o lote de importação. Você verá "Importação concluída com sucesso". As viagens recém-criadas entram com status <strong>Validada</strong>, prontas para serem atribuídas.</li>
+<li><strong>Confirme.</strong> Quando estiver satisfeito, clique em <strong>Confirmar importação</strong>. O sistema cria ou atualiza as viagens e finaliza o lote de importação. Você verá "Importação concluída com sucesso". As viagens recém-criadas entram com status <strong>Recebida</strong>, prontas para serem atribuídas.</li>
 </ol>
 
 <div class="callout tip"><p class="callout-title">Nada é criado até você confirmar</p><p>Enviar e validar apenas <em>mostram uma prévia</em> do que aconteceria. Nenhuma viagem existe até você clicar em <strong>Confirmar importação</strong>. Então você pode, com segurança, enviar um arquivo só para ver se está limpo, revisar as contagens e decidir se prossegue.</p></div>
@@ -2456,7 +2452,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <h4>What the row indicator columns mean</h4>
 <p>Each row carries at-a-glance indicators so you can scan the board without opening anything:</p>
 <dl class="glossary">
-<dt>Status <span class="pt">Status</span></dt><dd>The trip's current stage in its lifecycle. The 18 stages, in pt-BR, run: <em>Recebida</em> (received), <em>Erro de validação</em>, <em>Validada</em>, <em>Atribuída</em>, <em>Confirmada</em>, <em>Na origem</em>, <em>Carregando</em>, <em>Carregada</em>, <em>Em trânsito</em>, <em>No destino</em>, <em>Descarregando</em>, <em>Descarregada</em>, <em>Concluída</em>, <em>Faturamento pendente</em>, <em>Pronta p/ faturar</em>, <em>Faturada</em>, <em>Cancelada</em>, <em>Em disputa</em>.</dd>
+<dt>Status <span class="pt">Status</span></dt><dd>The trip's current stage in its lifecycle. The 16 stages, in pt-BR, run: <em>Recebida</em> (received), <em>Atribuída</em>, <em>Confirmada</em>, <em>Na origem</em>, <em>Carregando</em>, <em>Carregada</em>, <em>Em trânsito</em>, <em>No destino</em>, <em>Descarregando</em>, <em>Descarregada</em>, <em>Concluída</em>, <em>Faturamento pendente</em>, <em>Pronta p/ faturar</em>, <em>Faturada</em>, <em>Cancelada</em>, <em>Em disputa</em>.</dd>
 <dt>SLA risk <span class="pt">Risco de SLA</span></dt><dd>A coloured indicator showing the service-level health: <span class="pill is-good">No prazo</span> (on track), <span class="pill is-warn">Em risco</span> (at risk), <span class="pill is-bad">Atrasada</span> (late), <span class="pill is-bad">Violada</span> (breached). It tells you which trips are about to break a customer promise. (This column lights up once the execution feature that computes it is live.)</dd>
 <dt>Assignment <span class="pt">Atribuição</span></dt><dd>Whether the trip has a driver/vehicle/carrier attached yet. An unassigned trip is one nobody is committed to running. (This column lights up once the dispatch feature is live.)</dd>
 <dt>Billing <span class="pt">Faturamento</span></dt><dd>The billing stage, only filled once a trip reaches one: <em>Faturamento pendente</em> (pending), <em>Pronta p/ faturar</em> (ready to bill), <em>Faturada</em> (billed), <em>Em disputa</em> (disputed). A dash (—) means it isn't in billing yet.</dd>
@@ -2578,7 +2574,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <h4>O que significam as colunas de indicadores</h4>
 <p>Cada linha traz indicadores em um só olhar, para você varrer o quadro sem abrir nada:</p>
 <dl class="glossary">
-<dt>Status <span class="pt">Status</span></dt><dd>O estágio atual da viagem no seu ciclo de vida. Os 18 estágios, em pt-BR: <em>Recebida</em>, <em>Erro de validação</em>, <em>Validada</em>, <em>Atribuída</em>, <em>Confirmada</em>, <em>Na origem</em>, <em>Carregando</em>, <em>Carregada</em>, <em>Em trânsito</em>, <em>No destino</em>, <em>Descarregando</em>, <em>Descarregada</em>, <em>Concluída</em>, <em>Faturamento pendente</em>, <em>Pronta p/ faturar</em>, <em>Faturada</em>, <em>Cancelada</em>, <em>Em disputa</em>.</dd>
+<dt>Status <span class="pt">Status</span></dt><dd>O estágio atual da viagem no seu ciclo de vida. Os 16 estágios, em pt-BR: <em>Recebida</em>, <em>Atribuída</em>, <em>Confirmada</em>, <em>Na origem</em>, <em>Carregando</em>, <em>Carregada</em>, <em>Em trânsito</em>, <em>No destino</em>, <em>Descarregando</em>, <em>Descarregada</em>, <em>Concluída</em>, <em>Faturamento pendente</em>, <em>Pronta p/ faturar</em>, <em>Faturada</em>, <em>Cancelada</em>, <em>Em disputa</em>.</dd>
 <dt>Risco de SLA <span class="pt">Risco de SLA</span></dt><dd>Um indicador colorido mostrando a saúde do nível de serviço: <span class="pill is-good">No prazo</span>, <span class="pill is-warn">Em risco</span>, <span class="pill is-bad">Atrasada</span>, <span class="pill is-bad">Violada</span>. Mostra quais viagens estão prestes a quebrar uma promessa ao cliente. (Esta coluna passa a aparecer quando o recurso de execução que a calcula entra no ar.)</dd>
 <dt>Atribuição <span class="pt">Atribuição</span></dt><dd>Se a viagem já tem motorista/veículo/transportadora vinculados. Uma viagem sem atribuição é aquela que ninguém se comprometeu a realizar. (Esta coluna passa a aparecer quando o recurso de expedição entra no ar.)</dd>
 <dt>Faturamento <span class="pt">Faturamento</span></dt><dd>O estágio de faturamento, só preenchido quando a viagem chega a um: <em>Faturamento pendente</em>, <em>Pronta p/ faturar</em>, <em>Faturada</em>, <em>Em disputa</em>. Um traço (—) significa que ainda não entrou em faturamento.</dd>
@@ -2645,17 +2641,17 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 
 <section class="doc" id="dispatch" data-title-en="Assigning resources (Dispatch)" data-title-pt="Atribuindo recursos (Expedição)">
   <h2 class="sec-title"><span class="sec-ico" aria-hidden="true">🧩</span><span class="lang" data-lang="en">Assigning resources (Dispatch)</span><span class="lang" data-lang="pt">Atribuindo recursos (Expedição)</span><a class="sec-anchor" href="#dispatch" aria-label="link">#</a></h2>
-  <p class="sec-summary"><span class="lang" data-lang="en">How a Dispatcher turns a validated trip into a ready-to-run one by assigning a driver, vehicle, trailer and carrier, clearing the conflict checks, and confirming.</span><span class="lang" data-lang="pt">Como o Despachante transforma uma viagem validada em pronta para rodar atribuindo motorista, veículo, reboque e transportadora, resolvendo os alertas e confirmando.</span></p>
+  <p class="sec-summary"><span class="lang" data-lang="en">How a Dispatcher turns a received trip into a ready-to-run one by assigning a driver, vehicle, trailer and carrier, clearing the conflict checks, and confirming.</span><span class="lang" data-lang="pt">Como o Despachante transforma uma viagem recebida em pronta para rodar atribuindo motorista, veículo, reboque e transportadora, resolvendo os alertas e confirmando.</span></p>
   <div class="sec-body lang" data-lang="en">
 <p>In this part you'll learn how to take a trip that has already been checked and accepted and turn it into a trip that is actually ready to run on the road. This job is called <strong>dispatch</strong>, and the person who does it is a <strong>Dispatcher</strong> (in the Portuguese interface, <em>Despachante</em>). Dispatching means deciding <em>who</em> and <em>what</em> will run each trip: which driver drives it, which truck (vehicle) carries it, which trailer is hooked on if one is used, and — when the work is handed to an outside company — which carrier handles it. You do all of this on the <strong>Expedição</strong> (Dispatch) screen at <code>/dispatch</code>, or from a single trip's detail page at <code>/trips/[id]</code>.</p>
 <div class="callout analogy">
 <p class="callout-title">Think of it like a school field trip</p>
-<p>A validated trip is like a field trip that's already been approved: the date, the place and how many seats are needed are all set. But it can't actually happen until someone books a real bus, picks a real driver and confirms it. Dispatch is exactly that moment — you attach the real people and equipment to the plan, and the system warns you if, say, the bus is already booked that day or its safety inspection has expired.</p>
+<p>A received trip is like a field trip that's already been approved: the date, the place and how many seats are needed are all set. But it can't actually happen until someone books a real bus, picks a real driver and confirms it. Dispatch is exactly that moment — you attach the real people and equipment to the plan, and the system warns you if, say, the bus is already booked that day or its safety inspection has expired.</p>
 </div>
 <h3>What you'll need before you start</h3>
 <p>Two things must already be in place before a trip can be dispatched:</p>
 <ul>
-<li>The trip must be <strong>Validated</strong> (<em>Validada</em>) — that means its data has been checked and it's clean enough to execute. A trip that is still <em>Received</em> (<em>Recebida</em>) or has a validation error cannot be assigned yet.</li>
+<li>The trip must be <strong>Received</strong> (<em>Recebida</em>) — its data was already checked at import (or on manual create), so it's ready to assign right away.</li>
 <li>The <strong>resources</strong> you'll assign must already be registered in the system. Resources are the people and equipment that run trips: drivers (<em>Motoristas</em>), vehicles (<em>Veículos</em>), trailers (<em>Reboques</em>) and carriers (<em>Transportadoras</em>). These are maintained on the resource screens (<code>/resources/drivers</code>, <code>/resources/vehicles</code>, <code>/resources/trailers</code>, <code>/resources/carriers</code>).</li>
 </ul>
 <div class="glossary">
@@ -2703,7 +2699,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <li><strong>Pick a trip.</strong> Click <strong>Atribuir</strong> (Assign) on a row, or open a trip directly at <code>/trips/[id]</code> and use the <em>Atribuição de recursos</em> (resource assignment) panel.</li>
 <li><strong>Choose the resources.</strong> In the panel, pick a <strong>driver</strong> and a <strong>vehicle</strong>. Add a <strong>trailer</strong> only if the trip uses one, and add a <strong>carrier</strong> when the work is subcontracted. You can also write free-text <em>Observações</em> (notes) about the assignment.</li>
 <li><strong>Read the warnings.</strong> As you pick, the system checks the combination and lists any problems under <em>Alertas de elegibilidade</em> (eligibility alerts). The next section explains what each one means.</li>
-<li><strong>Save.</strong> Click <strong>Atribuir</strong> (Assign). If the combination is acceptable, the trip moves from <em>Validada</em> to <strong>Atribuída</strong> (Assigned), and the panel records who assigned it and when.</li>
+<li><strong>Save.</strong> Click <strong>Atribuir</strong> (Assign). If the combination is acceptable, the trip moves from <em>Recebida</em> to <strong>Atribuída</strong> (Assigned), and the panel records who assigned it and when.</li>
 </ol>
 <div class="callout warn">
 <p class="callout-title">A minimum set is required</p>
@@ -2764,7 +2760,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <li>A substitution by itself <strong>does not change the trip's status</strong> — swapping a driver on an Assigned or Confirmed trip leaves it Assigned or Confirmed.</li>
 <li>The same conflict checks and override rules apply to the new resources.</li>
 </ul>
-<p>You can also fully <strong>remove</strong> an assignment with <strong>Remover atribuição</strong> (Unassign): the resources come off and the trip goes back to <em>Validada</em>, while the prior assignment is still kept as history.</p>
+<p>You can also fully <strong>remove</strong> an assignment with <strong>Remover atribuição</strong> (Unassign): the resources come off and the trip goes back to <em>Recebida</em>, while the prior assignment is still kept as history.</p>
 <h3>Where assignment shows up across the system</h3>
 <p>Once you've dispatched trips, that information lights up the rest of the operating board:</p>
 <ul>
@@ -2774,19 +2770,19 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 </ul>
 <div class="callout key">
 <p class="callout-title">Key takeaways</p>
-<p>Dispatch is where a <em>Validada</em> trip becomes <em>Confirmada</em>. You assign a driver and vehicle (plus a trailer if used and a carrier if subcontracted) on <code>/dispatch</code> or the trip detail panel. The system checks for schedule conflicts, bad resource status, type mismatch, carrier eligibility and document problems. A <span class="pill is-bad">Bloqueio</span> stops you; an <span class="pill is-warn">Alerta</span> can be overridden with a recorded reason. Confirming captures a timestamp and re-checks everything. Each trip has one current assignment, and every change is kept in history.</p>
+<p>Dispatch is where a <em>Recebida</em> trip becomes <em>Confirmada</em>. You assign a driver and vehicle (plus a trailer if used and a carrier if subcontracted) on <code>/dispatch</code> or the trip detail panel. The system checks for schedule conflicts, bad resource status, type mismatch, carrier eligibility and document problems. A <span class="pill is-bad">Bloqueio</span> stops you; an <span class="pill is-warn">Alerta</span> can be overridden with a recorded reason. Confirming captures a timestamp and re-checks everything. Each trip has one current assignment, and every change is kept in history.</p>
 </div>
   </div>
   <div class="sec-body lang" data-lang="pt">
 <p>Nesta parte você vai aprender a pegar uma viagem que já foi conferida e aceita e transformá-la em uma viagem realmente pronta para rodar na estrada. Esse trabalho se chama <strong>expedição</strong>, e quem o realiza é o <strong>Despachante</strong>. Despachar significa decidir <em>quem</em> e <em>o quê</em> vai rodar cada viagem: qual motorista a dirige, qual caminhão (veículo) leva a carga, qual reboque é acoplado quando há um, e — quando o serviço é entregue a uma empresa externa — qual transportadora cuida dele. Você faz tudo isso na tela <strong>Expedição</strong>, em <code>/dispatch</code>, ou a partir da página de detalhe de uma viagem, em <code>/trips/[id]</code>.</p>
 <div class="callout analogy">
 <p class="callout-title">Pense como em um passeio escolar</p>
-<p>Uma viagem validada é como um passeio escolar que já foi aprovado: a data, o lugar e quantas vagas são necessárias já estão definidos. Mas ele só acontece de fato quando alguém reserva um ônibus de verdade, escolhe um motorista de verdade e confirma. A expedição é exatamente esse momento — você anexa as pessoas e os equipamentos reais ao plano, e o sistema avisa você se, por exemplo, o ônibus já estiver reservado naquele dia ou se a vistoria de segurança estiver vencida.</p>
+<p>Uma viagem recebida é como um passeio escolar que já foi aprovado: a data, o lugar e quantas vagas são necessárias já estão definidos. Mas ele só acontece de fato quando alguém reserva um ônibus de verdade, escolhe um motorista de verdade e confirma. A expedição é exatamente esse momento — você anexa as pessoas e os equipamentos reais ao plano, e o sistema avisa você se, por exemplo, o ônibus já estiver reservado naquele dia ou se a vistoria de segurança estiver vencida.</p>
 </div>
 <h3>O que você precisa antes de começar</h3>
 <p>Duas coisas já precisam estar prontas antes de uma viagem ser despachada:</p>
 <ul>
-<li>A viagem precisa estar <strong>Validada</strong> — ou seja, seus dados já foram conferidos e ela está limpa o suficiente para executar. Uma viagem ainda como <em>Recebida</em> ou com erro de validação ainda não pode ser atribuída.</li>
+<li>A viagem precisa estar <strong>Recebida</strong> — seus dados já foram conferidos na importação (ou na criação manual), então ela já está pronta para ser atribuída.</li>
 <li>Os <strong>recursos</strong> que você vai atribuir já precisam estar cadastrados no sistema. Recursos são as pessoas e os equipamentos que rodam as viagens: <strong>Motoristas</strong>, <strong>Veículos</strong>, <strong>Reboques</strong> e <strong>Transportadoras</strong>. Eles são mantidos nas telas de recursos (<code>/resources/drivers</code>, <code>/resources/vehicles</code>, <code>/resources/trailers</code>, <code>/resources/carriers</code>).</li>
 </ul>
 <div class="glossary">
@@ -2834,7 +2830,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <li><strong>Escolha uma viagem.</strong> Clique em <strong>Atribuir</strong> em uma linha, ou abra a viagem direto em <code>/trips/[id]</code> e use o painel <em>Atribuição de recursos</em>.</li>
 <li><strong>Selecione os recursos.</strong> No painel, escolha um <strong>motorista</strong> e um <strong>veículo</strong>. Adicione um <strong>reboque</strong> só se a viagem usar um, e adicione uma <strong>transportadora</strong> quando o serviço for subcontratado. Você também pode escrever <em>Observações</em> em texto livre sobre a atribuição.</li>
 <li><strong>Leia os alertas.</strong> Conforme você seleciona, o sistema verifica a combinação e lista os problemas em <em>Alertas de elegibilidade</em>. A próxima seção explica o que cada um significa.</li>
-<li><strong>Salve.</strong> Clique em <strong>Atribuir</strong>. Se a combinação for aceitável, a viagem passa de <em>Validada</em> para <strong>Atribuída</strong>, e o painel registra quem atribuiu e quando.</li>
+<li><strong>Salve.</strong> Clique em <strong>Atribuir</strong>. Se a combinação for aceitável, a viagem passa de <em>Recebida</em> para <strong>Atribuída</strong>, e o painel registra quem atribuiu e quando.</li>
 </ol>
 <div class="callout warn">
 <p class="callout-title">Existe um conjunto mínimo obrigatório</p>
@@ -2895,7 +2891,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 <li>Uma substituição, por si só, <strong>não muda o status da viagem</strong> — trocar o motorista de uma viagem Atribuída ou Confirmada a deixa Atribuída ou Confirmada.</li>
 <li>As mesmas verificações de conflito e regras de exceção se aplicam aos novos recursos.</li>
 </ul>
-<p>Você também pode <strong>remover</strong> totalmente uma atribuição com <strong>Remover atribuição</strong>: os recursos saem e a viagem volta para <em>Validada</em>, enquanto a atribuição anterior continua mantida como histórico.</p>
+<p>Você também pode <strong>remover</strong> totalmente uma atribuição com <strong>Remover atribuição</strong>: os recursos saem e a viagem volta para <em>Recebida</em>, enquanto a atribuição anterior continua mantida como histórico.</p>
 <h3>Onde a atribuição aparece pelo sistema</h3>
 <p>Depois de despachar as viagens, essa informação acende o resto do quadro operacional:</p>
 <ul>
@@ -2905,7 +2901,7 @@ footer.site{max-width:var(--maxw);margin:30px auto 50px;padding:22px 24px;color:
 </ul>
 <div class="callout key">
 <p class="callout-title">Pontos principais</p>
-<p>A expedição é onde uma viagem <em>Validada</em> vira <em>Confirmada</em>. Você atribui um motorista e um veículo (mais um reboque se for usado e uma transportadora se for subcontratado) em <code>/dispatch</code> ou no painel de detalhe da viagem. O sistema verifica conflitos de agenda, situação ruim do recurso, tipo de veículo divergente, elegibilidade da transportadora e problemas de documento. Um <span class="pill is-bad">Bloqueio</span> impede você; um <span class="pill is-warn">Alerta</span> pode ser ignorado com um motivo registrado. Confirmar captura um horário e reverifica tudo. Cada viagem tem uma atribuição atual, e toda mudança fica no histórico.</p>
+<p>A expedição é onde uma viagem <em>Recebida</em> vira <em>Confirmada</em>. Você atribui um motorista e um veículo (mais um reboque se for usado e uma transportadora se for subcontratado) em <code>/dispatch</code> ou no painel de detalhe da viagem. O sistema verifica conflitos de agenda, situação ruim do recurso, tipo de veículo divergente, elegibilidade da transportadora e problemas de documento. Um <span class="pill is-bad">Bloqueio</span> impede você; um <span class="pill is-warn">Alerta</span> pode ser ignorado com um motivo registrado. Confirmar captura um horário e reverifica tudo. Cada viagem tem uma atribuição atual, e toda mudança fica no histórico.</p>
 </div>
   </div>
 </section>
