@@ -206,8 +206,10 @@ async function validateRow(
     }
   }
 
-  // status label: the file's status is RECORDED/VALIDATED only — import never transitions from it
-  // (R10; trips land in `received`). An unknown customer label is flagged as a WARNING (never guessed,
+  // status label: the file's status is RECORDED only — import never uses it to transition a trip
+  // (R10). The file's status label does NOT drive the trip's status: newly created trips are born
+  // `validated` (slice 014), independent of this label. An unknown customer label is flagged as a
+  // WARNING (never guessed,
   // never blocks): the customer's status vocabulary is config (`status_mappings`), BLOCKED on real
   // files (PRD §29), so an unmapped label is surfaced for an operator to map rather than silently kept.
   const statusLabel = mapped.statusLabel;

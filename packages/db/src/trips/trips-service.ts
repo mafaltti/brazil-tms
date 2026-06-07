@@ -21,6 +21,15 @@ import {
 export type { TripDetail, TripSummary } from "./trip-dto";
 
 /**
+ * The only statuses a trip may be BORN at: `received` (default) or `validated` (import, slice 014).
+ * Any LATER status MUST be reached through the guarded `transitionTripStatus`, so the required
+ * assignment rows, `status_change` events, billing/cancellation side effects, and transition audit
+ * actually happen — `createTrip` writes ONLY the trip row + its `trip.create` audit. Keeping this
+ * narrow prevents a caller from minting a trip directly in `assigned`/`confirmed`/`cancelled`/etc.
+ */
+export type InitialTripStatus = "received" | "validated";
+
+/**
  * Create a trip and snapshot its plan. `original_plan` captures the create payload verbatim and is
  * written exactly once — no later service overwrites it (SC-002). The live `planned_*` columns are
  * seeded from the same input (the CURRENT accepted plan, R4). A single `trip.create` audit row is
@@ -34,8 +43,18 @@ export type { TripDetail, TripSummary } from "./trip-dto";
 export async function createTrip(
   input: CreateTripInput,
   actorUserId: string,
-  initialStatus: TripStatus = "received",
+  initialStatus: InitialTripStatus = "received",
 ): Promise<TripDetail> {
+  // Defence-in-depth for this system-of-record write: a trip may only be BORN `received` or
+  // `validated`. The param type enforces this for TS callers; this guards an `as`-cast / non-TS
+  // caller from minting a trip in a status that skips its required side effects + guarded audit.
+  if (initialStatus !== "received" && initialStatus !== "validated") {
+    throw new Error(
+      `createTrip: a trip can only be born "received" or "validated", not "${initialStatus}". ` +
+        "Use transitionTripStatus for any later status.",
+    );
+  }
+
   // The immutable snapshot of the imported/seeded plan (data-model §1, R4). Written once.
   const originalPlan = {
     customerId: input.customerId,
