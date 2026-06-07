@@ -113,6 +113,31 @@ describe.skipIf(!hasDb)("trips-service (integration)", () => {
     expect(audits).toHaveLength(1);
   });
 
+  it("born-validated: createTrip(input, actor, 'validated') creates a validated trip + a validated trip.create audit (slice 014)", async () => {
+    const detail = await createTrip(
+      {
+        customerId,
+        externalTripId: code("EXT"),
+        originLocationId: originId,
+        destinationLocationId: destId,
+      },
+      actorId,
+      "validated",
+    );
+    createdTripIds.push(detail.id);
+
+    // The trip is born `validated` (the confirm-import path), not `received`.
+    expect(detail.currentStatus).toBe("validated");
+
+    // The single trip.create audit records the born status — `validated` — with no extra write (SC-003).
+    const audits = await db
+      .select()
+      .from(auditLogs)
+      .where(and(eq(auditLogs.entityId, detail.id), eq(auditLogs.action, "trip.create")));
+    expect(audits).toHaveLength(1);
+    expect((audits[0]!.newValue as { currentStatus?: string }).currentStatus).toBe("validated");
+  });
+
   it("a non-status milestone event leaves planned columns intact and is surfaced separately (FR-006/FR-007)", async () => {
     const plannedPickup = new Date("2026-06-02T09:00:00.000Z");
     const created = await createTrip(

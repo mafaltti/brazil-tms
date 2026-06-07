@@ -59,8 +59,17 @@ let originId = "";
 let destId = "";
 let driverId = "";
 let vehicleId = "";
+let driverName = "";
+let vehiclePlate = "";
 let unassignedExternalId = "";
 let unassignedTripId = "";
+// Slice 014 (US3): a `received` trip the validated-only queue must EXCLUDE, and a dedicated `validated`
+// trip used to drive a COMPLETE assignment through the form (kept separate from `unassignedTripId`,
+// which later Control-Tower tests rely on staying unassigned).
+let receivedExternalId = "";
+let receivedTripId = "";
+let assignableExternalId = "";
+let assignableTripId = "";
 const tripIds: string[] = [];
 
 test.beforeAll(async () => {
@@ -110,20 +119,61 @@ test.beforeAll(async () => {
   unassignedTripId = trip[0]!.id;
   tripIds.push(unassignedTripId);
 
+  // A `received` trip, also unassigned + today: it WOULD appear under scope=active but must be excluded
+  // by the validated-only queue (slice 014 US3 / FR-006).
+  receivedExternalId = code("EXT-RECEBIDA");
+  const receivedTrip = await db
+    .insert(trips)
+    .values({
+      customerId,
+      externalTripId: receivedExternalId,
+      originLocationId: originId,
+      destinationLocationId: destId,
+      currentStatus: "received",
+      originalPlan: { customerId, originLocationId: originId, destinationLocationId: destId },
+      plannedVehicleType: "truck",
+      plannedPickupWindowStart: todayMidday,
+      plannedDeliveryWindowEnd: new Date(todayMidday.getTime() + 6 * 60 * 60 * 1000),
+    })
+    .returning({ id: trips.id });
+  receivedTripId = receivedTrip[0]!.id;
+  tripIds.push(receivedTripId);
+
+  // A second `validated`, unassigned trip used solely to complete an assignment via the form.
+  assignableExternalId = code("EXT-ATRIBUIR");
+  const assignableTrip = await db
+    .insert(trips)
+    .values({
+      customerId,
+      externalTripId: assignableExternalId,
+      originLocationId: originId,
+      destinationLocationId: destId,
+      currentStatus: "validated",
+      originalPlan: { customerId, originLocationId: originId, destinationLocationId: destId },
+      plannedVehicleType: "truck",
+      plannedPickupWindowStart: todayMidday,
+      plannedDeliveryWindowEnd: new Date(todayMidday.getTime() + 6 * 60 * 60 * 1000),
+    })
+    .returning({ id: trips.id });
+  assignableTripId = assignableTrip[0]!.id;
+  tripIds.push(assignableTripId);
+
+  driverName = `Motorista Board ${code("D")}`;
   const drv = await db
     .insert(drivers)
     .values({
-      name: `Motorista Board ${code("D")}`,
+      name: driverName,
       ownershipType: "owned",
       status: "active",
       licenseExpiry: farFutureDate(),
     })
     .returning({ id: drivers.id });
   driverId = drv[0]!.id;
+  vehiclePlate = uniquePlate();
   const veh = await db
     .insert(vehicles)
     .values({
-      plate: uniquePlate(),
+      plate: vehiclePlate,
       vehicleType: "truck",
       ownershipType: "owned",
       status: "active",
@@ -162,6 +212,10 @@ test.describe("US5 — Dispatch Board", () => {
     await expect(tripLink).toBeVisible({ timeout: 15_000 });
     await expect(tripLink).toHaveAttribute("href", `/trips/${unassignedTripId}`);
 
+    // Slice 014 (US3 / FR-006): the validated-only queue EXCLUDES a `received` trip — it offers no
+    // "Atribuir" that would fail with ILLEGAL_TRANSITION.
+    await expect(page.getByRole("link", { name: receivedExternalId })).toHaveCount(0);
+
     // The per-row assign action ("Atribuir") opens the shared assignment form dialog.
     const row = page.getByRole("listitem").filter({ hasText: unassignedExternalId });
     await row.getByRole("button", { name: "Atribuir" }).click();
@@ -169,6 +223,34 @@ test.describe("US5 — Dispatch Board", () => {
     await expect(dialog).toBeVisible();
     // The shared AssignmentForm exposes the driver picker (label "Motorista").
     await expect(dialog.getByText("Motorista", { exact: true })).toBeVisible();
+  });
+
+  test("a complete assignment from the validated-only queue succeeds (validated → assigned) (slice 014 US3)", async ({
+    page,
+  }) => {
+    await login(page, testAccounts.opsManager);
+    await page.goto("/dispatch");
+    await expect(page.getByText("Fila de atribuição")).toBeVisible({ timeout: 15_000 });
+
+    // Open the assign dialog for the dedicated validated trip.
+    const row = page.getByRole("listitem").filter({ hasText: assignableExternalId });
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    await row.getByRole("button", { name: "Atribuir" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // Pick the seeded driver + vehicle. Radix Select renders its options in a portal, so the option
+    // role is queried at the page level (driver label = name, vehicle label = plate).
+    await dialog.getByLabel("Motorista", { exact: true }).click();
+    await page.getByRole("option", { name: driverName }).click();
+    await dialog.getByLabel("Veículo", { exact: true }).click();
+    await page.getByRole("option", { name: vehiclePlate }).click();
+
+    // Clean (owned, matching, active, non-expired) resources ⇒ no block/warn findings ⇒ the assign
+    // action enables; submit it. onDone closes the dialog ONLY on a successful assign (a failure keeps
+    // it open with an error), so a hidden dialog is the success signal (validated → assigned).
+    await dialog.getByRole("button", { name: "Atribuir" }).click();
+    await expect(dialog).toBeHidden({ timeout: 15_000 });
   });
 });
 

@@ -23,7 +23,11 @@ import { runGenerateErrorReport } from "../generate-error-report";
  * T033 — `import.confirm` job (data-model R8; contract §C/§A). Per row best-effort + idempotent: for
  * each `valid`/`warning` row with `applied_at IS NULL`, call the PROMOTED 003 trip-write services
  * (`createTrip`/`updateTripPlan`) — never re-implementing trip creation, the status machine, or the
- * audit. Imported trips land in `received` (the service default); import never transitions status.
+ * audit. Newly created trips are born `validated` (slice 014, FR-009): the trip-level validation gate
+ * (PRD §11) is already satisfied by import-time per-row validation, so a passing imported row IS a
+ * validated trip — `createTrip` is called with `initialStatus = "validated"` (atomic, in one tx). Import
+ * never changes an EXISTING trip's status: the `updateTripPlan` paths (update + unique-race fallback)
+ * and `no_op` are status-neutral, so an already-`assigned`/`in_transit` trip keeps its status (FR-002).
  *
  * IDEMPOTENCY: a row's `applied_at`/`target_trip_id` guard makes a re-run skip already-applied rows,
  * so re-running creates 0 new trips. The trips partial unique index `(customer_id, external_trip_id)`
@@ -146,7 +150,8 @@ export async function runConfirm(payload: ConfirmPayload): Promise<void> {
         // A potential_duplicate had NO external-id match → it creates a NEW trip, exactly like `new`.
         // Its POTENTIAL_DUPLICATE reason already lives on the import row; we do not drop or skip it.
         try {
-          const trip = await createTrip(input, actorUserId);
+          // Born validated (slice 014): a passing imported row IS a validated trip.
+          const trip = await createTrip(input, actorUserId, "validated");
           targetTripId = trip.id;
         } catch (err) {
           // Race backstop: a concurrent insert won the partial-unique index → re-resolve as update.
@@ -167,8 +172,8 @@ export async function runConfirm(payload: ConfirmPayload): Promise<void> {
           await updateTripPlan(existing.id, planChanges, {}, actorUserId);
           targetTripId = existing.id;
         } else {
-          // The matched trip vanished between detection and confirm → create it.
-          const trip = await createTrip(input, actorUserId);
+          // The matched trip vanished between detection and confirm → create it (born validated, slice 014).
+          const trip = await createTrip(input, actorUserId, "validated");
           targetTripId = trip.id;
         }
       } else if (row.matchDecision === "no_op") {

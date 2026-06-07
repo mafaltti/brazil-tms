@@ -1,16 +1,21 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, eq, inArray } from "drizzle-orm";
 import {
+  assignTrip,
   auditLogs,
   customers,
   alerts,
   db,
+  drivers,
   importBatches,
   importRows,
   importTemplates,
   locations,
+  tripAssignments,
+  tripEvents,
   trips,
   users,
+  vehicles,
 } from "@brazil-tms/db";
 import { originalStorageKey, putOriginal } from "@brazil-tms/db/storage";
 import { runParse } from "../parse";
@@ -20,9 +25,12 @@ import { runConfirm } from "./index";
 
 /**
  * T039 — confirm job integration test: drive the full US1 pipeline (parse → validate →
- * detect-duplicates → confirm) against the live dev DB + Storage, asserting trips are created in
- * `received` linked to the batch, the confirm is idempotent (a re-run creates 0 new trips), and the
- * batch counts are tallied. Static imports per project convention; skips without DATABASE_URL.
+ * detect-duplicates → confirm) against the live dev DB + Storage, asserting trips are created
+ * **born `validated`** (slice 014) and linked to the batch, the confirm is idempotent (a re-run creates
+ * 0 new trips), and the batch counts are tallied. Slice 014 also asserts: a confirm-created trip assigns
+ * immediately (`validated → assigned`, no ILLEGAL_TRANSITION), and an `update` to an already-`assigned`
+ * trip keeps its status (FR-002, never downgraded). Static imports per project convention; skips without
+ * DATABASE_URL.
  */
 const hasDb = Boolean(process.env.DATABASE_URL);
 
@@ -30,6 +38,10 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
   let actorId = "";
   let customerId = "";
   let templateId = "";
+  // Owned active driver + matching `truck` vehicle (far-future docs) so a confirm-created trip can be
+  // assigned in-test to prove `validated → assigned` works (slice 014, US1).
+  let driverId = "";
+  let vehicleId = "";
   const createdBatchIds: string[] = [];
   const createdCustomerIds: string[] = [];
   const createdTripIds: string[] = [];
@@ -83,6 +95,31 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
       })
       .returning();
     templateId = template[0]!.id;
+
+    // Resources for the in-test assignment (owned ⇒ no carrier required; far-future expiries ⇒ no
+    // documentation finding; `truck` matches the CSV `Truck` vehicle so no type-mismatch BLOCK).
+    const driver = await db
+      .insert(drivers)
+      .values({
+        name: uniq("Motorista Confirm"),
+        ownershipType: "owned",
+        status: "active",
+        licenseExpiry: "2030-01-01",
+      })
+      .returning();
+    driverId = driver[0]!.id;
+
+    const vehicle = await db
+      .insert(vehicles)
+      .values({
+        plate: uniq("PLT").slice(0, 12),
+        vehicleType: "truck",
+        ownershipType: "owned",
+        status: "active",
+        documentExpiry: "2030-01-01",
+      })
+      .returning();
+    vehicleId = vehicle[0]!.id;
   });
 
   afterAll(async () => {
@@ -96,9 +133,14 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
       await db.delete(auditLogs).where(eq(auditLogs.entityId, tripId));
     }
     if (createdTripIds.length > 0) {
+      // FK-safe: drop assignment + event children before the trips they reference.
+      await db.delete(tripAssignments).where(inArray(tripAssignments.tripId, createdTripIds));
+      await db.delete(tripEvents).where(inArray(tripEvents.tripId, createdTripIds));
       await db.delete(alerts).where(inArray(alerts.tripId, createdTripIds));
       await db.delete(trips).where(inArray(trips.id, createdTripIds));
     }
+    if (driverId) await db.delete(drivers).where(eq(drivers.id, driverId));
+    if (vehicleId) await db.delete(vehicles).where(eq(vehicles.id, vehicleId));
     for (const batchId of createdBatchIds) {
       await db.delete(auditLogs).where(eq(auditLogs.entityId, batchId));
       await db.delete(importBatches).where(eq(importBatches.id, batchId));
@@ -130,7 +172,7 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
     return batchId;
   }
 
-  it("creates trips in 'received' linked to the batch; re-running confirm is idempotent", async () => {
+  it("creates trips born validated linked to the batch; re-running confirm is idempotent", async () => {
     const extA = uniq("SH-A");
     const extB = uniq("SH-B");
     const csv = [
@@ -164,7 +206,8 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
 
     expect(created).toHaveLength(2);
     for (const t of created) {
-      expect(t.currentStatus).toBe("received");
+      // Born validated (slice 014, FR-001/FR-004) — never first persisted as `received`.
+      expect(t.currentStatus).toBe("validated");
       expect(t.importBatchId).toBe(batchId);
       expect(t.customerId).toBe(customerId);
     }
@@ -276,5 +319,150 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
         .limit(1)
     )[0]!;
     expect(batch2.status).toBe("completed");
+  });
+
+  it("a confirm-created trip assigns immediately (validated → assigned), no ILLEGAL_TRANSITION (slice 014 US1)", async () => {
+    const ext = uniq("SH-ASSIGN");
+    const csv = [
+      "trip_id,origin,destination,pickup_start,vehicle",
+      `${ext},ORIG,DEST,2026-07-15 08:00,Truck`,
+    ].join("\n");
+    const batchId = await seedBatchWithCsv(csv);
+    await runParse({ batchId, storageKey: originalStorageKey(batchId) });
+    await runValidate({ batchId });
+    await runDetectDuplicates({ batchId });
+    await runConfirm({ batchId, actorUserId: actorId });
+
+    const created = await db.select().from(trips).where(eq(trips.importBatchId, batchId));
+    for (const t of created) createdTripIds.push(t.id);
+    expect(created).toHaveLength(1);
+    const trip = created[0]!;
+    expect(trip.currentStatus).toBe("validated"); // born validated — immediately assignable.
+
+    // Assign right away: proves `validated → assigned` works with NO manual validate step (the bug this
+    // slice fixes was an ILLEGAL_TRANSITION because the trip was stuck at `received`). overrideReason
+    // absorbs any eligibility WARN (e.g. a vehicle-type label difference) so the transition is the focus.
+    const { trip: assigned } = await assignTrip(
+      trip.id,
+      {
+        driverId,
+        vehicleId,
+        expectedFromStatus: "validated",
+        overrideReason: "Slice 014 — teste de atribuição imediata",
+      },
+      actorId,
+    );
+    expect(assigned.currentStatus).toBe("assigned");
+  });
+
+  it("an import update to an already-assigned trip keeps its status and updates its plan (slice 014 US2, FR-002)", async () => {
+    const ext = uniq("SH-UPD");
+    // Batch 1 — create (born validated) + assign → the trip is now `assigned` (in-flight).
+    const csv1 = [
+      "trip_id,origin,destination,pickup_start,vehicle",
+      `${ext},ORIG,DEST,2026-08-10 08:00,Truck`,
+    ].join("\n");
+    const batch1 = await seedBatchWithCsv(csv1);
+    await runParse({ batchId: batch1, storageKey: originalStorageKey(batch1) });
+    await runValidate({ batchId: batch1 });
+    await runDetectDuplicates({ batchId: batch1 });
+    await runConfirm({ batchId: batch1, actorUserId: actorId });
+
+    const created = await db.select().from(trips).where(eq(trips.importBatchId, batch1));
+    for (const t of created) createdTripIds.push(t.id);
+    expect(created).toHaveLength(1);
+    const tripId = created[0]!.id;
+    const beforePickup = created[0]!.plannedPickupWindowStart;
+
+    const { trip: assigned } = await assignTrip(
+      tripId,
+      { driverId, vehicleId, expectedFromStatus: "validated", overrideReason: "Slice 014 — US2 setup" },
+      actorId,
+    );
+    expect(assigned.currentStatus).toBe("assigned");
+
+    // Batch 2 — SAME external id, CHANGED pickup window → detect-duplicates resolves it as `update`.
+    const csv2 = [
+      "trip_id,origin,destination,pickup_start,vehicle",
+      `${ext},ORIG,DEST,2026-08-10 14:00,Truck`,
+    ].join("\n");
+    const batch2 = await seedBatchWithCsv(csv2);
+    await runParse({ batchId: batch2, storageKey: originalStorageKey(batch2) });
+    await runValidate({ batchId: batch2 });
+    await runDetectDuplicates({ batchId: batch2 });
+    const updRow = (
+      await db.select().from(importRows).where(eq(importRows.importBatchId, batch2))
+    )[0]!;
+    expect(updRow.matchDecision).toBe("update");
+
+    await runConfirm({ batchId: batch2, actorUserId: actorId });
+
+    // The plan changed but the status stayed `assigned` — NEVER reverted to `validated` (FR-002).
+    const after = (await db.select().from(trips).where(eq(trips.id, tripId)).limit(1))[0]!;
+    expect(after.currentStatus).toBe("assigned");
+    expect(after.plannedPickupWindowStart?.getTime()).not.toBe(beforePickup?.getTime());
+  });
+
+  it("a new row re-resolved via the unique-key race leaves an existing assigned trip's status unchanged (slice 014 US2, I2)", async () => {
+    const ext = uniq("SH-RACE");
+    // Setup: create (born validated) + assign a trip via the normal import path.
+    const csv = [
+      "trip_id,origin,destination,pickup_start,vehicle",
+      `${ext},ORIG,DEST,2026-09-20 08:00,Truck`,
+    ].join("\n");
+    const batch1 = await seedBatchWithCsv(csv);
+    await runParse({ batchId: batch1, storageKey: originalStorageKey(batch1) });
+    await runValidate({ batchId: batch1 });
+    await runDetectDuplicates({ batchId: batch1 });
+    await runConfirm({ batchId: batch1, actorUserId: actorId });
+    const trip = (await db.select().from(trips).where(eq(trips.importBatchId, batch1)))[0]!;
+    createdTripIds.push(trip.id);
+    await assignTrip(
+      trip.id,
+      { driverId, vehicleId, expectedFromStatus: "validated", overrideReason: "Slice 014 — race setup" },
+      actorId,
+    );
+
+    // Craft a manual batch + a row FORCED to `new` whose mapped points to the SAME (customer, external
+    // id). Confirm's createTrip then hits the partial-unique 23505 and re-resolves to updateTripPlan —
+    // the race-fallback path — which is status-neutral by construction.
+    const manualBatch = await db
+      .insert(importBatches)
+      .values({
+        customerId,
+        templateId,
+        fileName: "race.csv",
+        storageKey: "n/a",
+        uploadedBy: actorId,
+      })
+      .returning();
+    const manualBatchId = manualBatch[0]!.id;
+    createdBatchIds.push(manualBatchId);
+    await db.insert(importRows).values({
+      importBatchId: manualBatchId,
+      rowNumber: 1,
+      raw: {},
+      mapped: {
+        externalTripId: ext,
+        originLocationId: trip.originLocationId,
+        destinationLocationId: trip.destinationLocationId,
+        plannedRouteNotes: "RACE-UPDATED",
+      },
+      outcome: "valid",
+      matchDecision: "new", // forced `new` despite the existing trip → exercises the race fallback.
+    });
+
+    await runConfirm({ batchId: manualBatchId, actorUserId: actorId });
+
+    // No duplicate trip; the existing trip kept `assigned` and only its plan updated.
+    const sameExt = await db
+      .select()
+      .from(trips)
+      .where(and(eq(trips.customerId, customerId), eq(trips.externalTripId, ext)));
+    expect(sameExt).toHaveLength(1);
+    const after = sameExt[0]!;
+    expect(after.id).toBe(trip.id);
+    expect(after.currentStatus).toBe("assigned"); // never reverted to validated.
+    expect(after.plannedRouteNotes).toBe("RACE-UPDATED");
   });
 });

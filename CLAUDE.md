@@ -67,40 +67,41 @@ Start with two packages (`shared`, `db`); add more only with justification.
 - Code style is enforced by ESLint/Prettier — not by this file. Tests: Vitest + Playwright.
 
 <!-- SPECKIT START -->
-Active feature plan: `specs/013-predefined-import-template/plan.md` (Predefined Import Template).
+Active feature plan: `specs/014-auto-validate-imports/plan.md` (Auto-Validate Imported Trips).
 For technologies, project structure, BFF/auth patterns, data model, contracts, and setup/test commands,
 read that plan and its `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`.
-This is a **corrective simplification of slice 004 (trip import)** that **references** 004 (it does not edit the shipped
-004 spec). **Problem**: on `/imports` the operator must pick an import template ("Modelo"), but there is **no UI to create
-one**, the select is **optional in the form yet the parse worker hard-fails** the batch when none is attached ("Nenhum
-modelo de importação selecionado."), and that reason is **invisible on `/imports/history`** — a silent trap. **Goal**:
-remove template selection entirely. Ship **one in-code `STANDARD_IMPORT_TEMPLATE` constant** (`@brazil-tms/shared`
-`src/import/standard-template.ts`) — the slice-004 demo mapping (`packages/db/seed/import-sample.ts`) **verbatim**, as one
-`TemplateConfig` object: headers `id_viagem→externalTripId`(req), `origem→originCode`(req), `destino→destinationCode`(req),
-`janela_coleta_*`/`janela_entrega_*` windows, `tipo_veiculo`, `status`; rules `dd/MM/yyyy HH:mm`, `America/Sao_Paulo`,
-decimal `,`, thousand `.`; `requiredOverrides: []`. The **parse worker** (`workers/jobs/parse/index.ts`) uses the constant
-whenever `batch.template_id` is null (replacing the null-template failure branch) and chooses CSV-vs-XLSX from
-**`inferFileType(batch.fileName)`** — that helper is **relocated** into `@brazil-tms/shared` `src/import/file-type.ts` so
-the BFF route and the worker share one canonical extension rule (DRY-for-correctness, the only extraction; precedent:
-009 `onTimeExpr`). **The validate worker is UNCHANGED** — `loadRequiredOverrides(null)` already returns `[]` and status
-labels are customer-keyed; **`createBatch` is UNCHANGED** — it already stores `template_id ?? null`. The `/imports` upload
-screen (`apps/web/components/imports/trip-import-client.tsx`) collapses to **Cliente + Arquivo**: remove the Modelo
-`Select`/`templateId` state/`templatesQuery`/the `/api/import-templates` call, stop sending `templateId`, add an
-**always-visible pt-BR provisional banner** (new flat key `Imports.provisionalNotice`, mirroring the 009 banner), and
-**prune** dead i18n (`template`/`selectTemplate`/`noTemplates`) + **rewrite** `uploadSubtitle`. The standard format is a
-**labeled §29 (#2–#5) provisional default** — NOT marked complete; swapping a real signed-off format later is a
-**single-object edit** (FR-010/SC-007). **Adds NOTHING durable**: NO new table, column (notably **no `file_type` column**),
-enum, migration, permission key, package, worker job, or runtime dependency. The `import_templates` table + its
-list/detail/create/update/archive endpoints stay **dormant** (retained for future per-customer configs; the deferred
-slice-012 admin UI can recover them). Validation/dedup/confirm/status-mapping/history are **unchanged** (trips still land
-in `received`); a wrong-columns file surfaces the **existing per-row reasons** (`MISSING_EXTERNAL_ID`/`UNKNOWN_LOCATION`)
-with **no** header-level "wrong format" message, and an empty/header-only file shows an empty preview; surfacing
-batch-failure reasons on the **history** screen is an explicit **follow-up (out of scope)**. New work: 2 shared symbols
-(`STANDARD_IMPORT_TEMPLATE` + relocated `inferFileType`); 1 parse-worker edit; 1 client-screen edit; 1 i18n file edit
-(`apps/web/messages/pt-BR.json`); ~3–4 test files (`parse.test.ts`, `messages.test.ts`, `e2e/trip-import.spec.ts`, an
-optional shared unit test). Builds on `specs/004-trip-import-validation/` (the import pipeline, `applyTemplate` engine,
-`import_batches`/`import_rows`, validation/preview/error-report/history it reuses). **Slice numbering note**: 010–012 are
-already used by orphaned, reverted slices (in tag `mvp-001-012-snapshot`); this corrective slice is **013** to avoid
-collision. Out of scope (Future): per-customer templates/formats, any template-management UI (the dormant slice-012),
-history reason-visibility, and any new header-level/required-column validation.
+This is a **corrective behavior change** to the import→dispatch flow that **references** shipped slices 004 (import
+pipeline), 006 (dispatch/assignment), 013 (predefined import template), and 003 (trip status machine) — it does **not**
+edit their shipped specs. **Problem**: imported trips land in trip status `received`, but assignment requires `validated`
+(`received → validated → assigned`), and there is **no operator UI** to make that hop (the assignment panel renders only
+for validated/assigned/confirmed; the execution-timeline milestone buttons exclude validated). So every imported trip is
+stranded before dispatch, and the Expedição (`/dispatch`) queue — which queries `assigned=false&scope=active`, and
+`scope=active` includes `received` — lists those trips with an "Atribuir" action that fails with `ILLEGAL_TRANSITION`
+("Operação não permitida para o status atual da viagem"). **Goal**: **auto-validate on import** — since the import
+pipeline already validates every row (outcome valid/warning/error, only valid/warning applied), a row that passed import
+validation **is** a validated trip; collapse the redundant trip-validation step. **Decision (spec §Clarifications,
+born-validated, atomic)**: extend the promoted `createTrip` (`packages/db/src/trips/trips-service.ts`) with an **optional
+3rd param `initialStatus: TripStatus = "received"`** (replacing the hardcoded `"received"` at the insert AND the
+`trip.create` audit `newValue`); the **two** `createTrip` sites in `workers/jobs/confirm-import/index.ts` (lines ~149
+`new`/`potential_duplicate`, ~171 `update`-vanished→create) pass `"validated"`. The trip is **born `validated`** in
+`createTrip`'s single transaction — never first persisted as `received` — so **no** worker-crash window can strand it
+(verified across crash/re-run orderings; a unique-key race re-resolves to a status-neutral `updateTripPlan`). **Critical
+invariant**: `updateTripPlan` paths (the `update` match decision and the race-fallback) and **all 9 other `createTrip`
+callers** (notably `manual-create.ts`, kept `received`) are **UNCHANGED** — an `update` to an already-`assigned`/
+`in_transit` trip must keep its status (FR-002). The legal-transition machine is **not** weakened: born-validated is an
+*initial* insert status, not a transition; transitions out of `validated` still route through the guarded
+`transitionTripStatus`. **Secondary fix**: narrow the dispatch queue — `apps/web/components/trips/dispatch/dispatch-board.tsx`
+`DISPATCH_QUERY` from `"assigned=false&scope=active&sort=pickupStart"` to **`"assigned=false&status=validated&sort=pickupStart"`**
+(a non-empty `status` suppresses the `scope=active` default in `buildWhere` and composes with `assigned=false` → only
+unassigned validated trips; `status` is read via `params.getAll`). **Adds NOTHING durable**: NO new table, column, enum
+value, migration, permission, package, worker job, or runtime dependency — reuses the existing `validated` enum value and
+the creation+audit path (one backward-compatible optional param). New work: 1 db-service edit (+2 confirm-import call-site
+args + header comment), 1 client query-string edit; tests — EDIT `workers/jobs/confirm-import/confirm.test.ts` (the
+`received`→`validated` assertion + add: update doesn't downgrade an assigned trip; a confirm-created trip assigns
+immediately), ADD a `dispatch-board.spec.ts` assertion (queue lists only validated; a seeded `received` trip excluded),
+EDIT `e2e/trip-import.spec.ts` (post-confirm trips show "Validada"). All dispatch e2e already seed `currentStatus:"validated"`
+(unchanged); `manual-create.test.ts`/`trips-service.test.ts` (default `received`) + `import-batches-service.test.ts` (batch
+status) UNCHANGED. Out of scope (Future): a manual "Validar" UI action; born-validating the manual trip-create path;
+backfilling pre-existing `received` trips; reaching `validation_error` via import (error rows never applied); history
+batch-failure visibility.
 <!-- SPECKIT END -->

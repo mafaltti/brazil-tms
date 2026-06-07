@@ -21,14 +21,20 @@ import {
 export type { TripDetail, TripSummary } from "./trip-dto";
 
 /**
- * Create a trip in status `received` and snapshot its plan. `original_plan` captures the create
- * payload verbatim and is written exactly once — no later service overwrites it (SC-002). The live
- * `planned_*` columns are seeded from the same input (the CURRENT accepted plan, R4). A single
- * `trip.create` audit row is written in the same transaction as the insert (SC-003).
+ * Create a trip and snapshot its plan. `original_plan` captures the create payload verbatim and is
+ * written exactly once — no later service overwrites it (SC-002). The live `planned_*` columns are
+ * seeded from the same input (the CURRENT accepted plan, R4). A single `trip.create` audit row is
+ * written in the same transaction as the insert (SC-003).
+ *
+ * `initialStatus` (slice 014) is the trip's born status — default `received` preserves every existing
+ * caller; `confirm-import` passes `validated` so an imported trip is born validated, atomically, in this
+ * one transaction (never first persisted as `received`). It is an *initial* INSERT status, not a
+ * transition — transitions out of it still route through the guarded `transitionTripStatus`.
  */
 export async function createTrip(
   input: CreateTripInput,
   actorUserId: string,
+  initialStatus: TripStatus = "received",
 ): Promise<TripDetail> {
   // The immutable snapshot of the imported/seeded plan (data-model §1, R4). Written once.
   const originalPlan = {
@@ -60,7 +66,7 @@ export async function createTrip(
         originLocationId: input.originLocationId,
         destinationLocationId: input.destinationLocationId,
         laneId: input.laneId ?? null,
-        currentStatus: "received",
+        currentStatus: initialStatus,
         originalPlan,
         plannedPickupWindowStart: input.plannedPickupWindowStart ?? null,
         plannedPickupWindowEnd: input.plannedPickupWindowEnd ?? null,
@@ -82,7 +88,7 @@ export async function createTrip(
       entityId: row.id,
       action: "trip.create",
       previousValue: null,
-      newValue: { currentStatus: "received", originalPlan },
+      newValue: { currentStatus: initialStatus, originalPlan },
       actorUserId,
     });
 
