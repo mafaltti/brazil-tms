@@ -2,9 +2,10 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { TriangleAlert } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { VEHICLE_TYPE_VALUES } from "@brazil-tms/shared";
+import { STANDARD_IMPORT_TEMPLATE, VEHICLE_TYPE_VALUES } from "@brazil-tms/shared";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -57,15 +58,6 @@ interface CustomerOption {
   id: string;
   name: string;
   customerCode: string;
-}
-
-interface ImportTemplate {
-  id: string;
-  customerId: string;
-  name: string;
-  version: number;
-  active: boolean;
-  archived: boolean;
 }
 
 interface ImportBatchDetail {
@@ -165,10 +157,10 @@ export function TripImportClient() {
   const queryClient = useQueryClient();
 
   const [customerId, setCustomerId] = useState<string>("");
-  const [templateId, setTemplateId] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
   const [batchId, setBatchId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [formatOpen, setFormatOpen] = useState(false);
 
   // 1. Customers (reuse the master-data query key, same endpoint).
   const customersQuery = useQuery({
@@ -177,17 +169,6 @@ export function TripImportClient() {
       fetchJson<{ items: CustomerOption[] }>("/api/master-data/customers").then(
         (b) => b.items,
       ),
-    staleTime: 30_000,
-  });
-
-  // 2. Templates for the selected customer (active only).
-  const templatesQuery = useQuery({
-    queryKey: ["import-templates", customerId],
-    queryFn: () =>
-      fetchJson<{ items: ImportTemplate[] }>(
-        `/api/import-templates?customerId=${encodeURIComponent(customerId)}`,
-      ).then((b) => b.items.filter((tpl) => tpl.active && !tpl.archived)),
-    enabled: Boolean(customerId),
     staleTime: 30_000,
   });
 
@@ -237,7 +218,6 @@ export function TripImportClient() {
       const form = new FormData();
       form.append("file", file);
       form.append("customerId", customerId);
-      if (templateId) form.append("templateId", templateId);
       const res = await fetch("/api/imports", { method: "POST", body: form });
       if (!res.ok) throw new Error(`UPLOAD_FAILED:${res.status}`);
       return (await res.json()) as { id: string };
@@ -356,6 +336,27 @@ export function TripImportClient() {
     confirmMutation.reset();
   }
 
+  // Build + download a ready-to-fill sample CSV from the SAME source of truth the worker maps against
+  // (STANDARD_IMPORT_TEMPLATE), so the headers can never drift from the real format. Header row + one
+  // example row; BOM so Excel (pt-BR) opens the accents correctly.
+  function downloadSampleCsv() {
+    const cols = STANDARD_IMPORT_TEMPLATE.columnMappings;
+    // RFC 4180: quote any field containing a comma, quote, or newline (today's values are safe, but a
+    // future label/example edit must not silently corrupt the file).
+    const escape = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const header = cols.map((c) => escape(c.source)).join(",");
+    const example = cols.map((c) => escape(t(`expectedColumns.${c.source}.example`))).join(",");
+    const blob = new Blob([`\uFEFF${header}\n${example}\n`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = t("sampleFileName");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   const counts = batch
     ? {
         created: batch.createdCount,
@@ -377,6 +378,16 @@ export function TripImportClient() {
         </Button>
       </div>
 
+      {/* Provisional standard-format notice (US2, FR-007) — always visible; the standard import format is
+          a §29-blocked documented default pending customer sign-off. Mirrors the 009 provisional banner. */}
+      <div
+        role="status"
+        className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+      >
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+        <span>{t("provisionalNotice")}</span>
+      </div>
+
       {/* Upload form */}
       <Card>
         <CardHeader>
@@ -385,59 +396,28 @@ export function TripImportClient() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              {/* Customer */}
-              <div className="space-y-2">
-                <Label htmlFor="import-customer">{t("customer")}</Label>
-                <Select
-                  value={customerId}
-                  onValueChange={(value) => {
-                    setCustomerId(value);
-                    setTemplateId("");
-                  }}
-                  disabled={customersQuery.isLoading || Boolean(batchId)}
-                >
-                  <SelectTrigger id="import-customer">
-                    <SelectValue placeholder={t("selectCustomer")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(customersQuery.data ?? []).map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name} ({c.customerCode})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {customersQuery.isError ? (
-                  <p className="text-sm text-destructive">{t("customersLoadError")}</p>
-                ) : null}
-              </div>
-
-              {/* Template */}
-              <div className="space-y-2">
-                <Label htmlFor="import-template">{t("template")}</Label>
-                <Select
-                  value={templateId}
-                  onValueChange={setTemplateId}
-                  disabled={
-                    !customerId || templatesQuery.isLoading || Boolean(batchId)
-                  }
-                >
-                  <SelectTrigger id="import-template">
-                    <SelectValue placeholder={t("selectTemplate")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(templatesQuery.data ?? []).map((tpl) => (
-                      <SelectItem key={tpl.id} value={tpl.id}>
-                        {tpl.name} (v{tpl.version})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {customerId && templatesQuery.data?.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{t("noTemplates")}</p>
-                ) : null}
-              </div>
+            {/* Customer */}
+            <div className="space-y-2">
+              <Label htmlFor="import-customer">{t("customer")}</Label>
+              <Select
+                value={customerId}
+                onValueChange={setCustomerId}
+                disabled={customersQuery.isLoading || Boolean(batchId)}
+              >
+                <SelectTrigger id="import-customer">
+                  <SelectValue placeholder={t("selectCustomer")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {(customersQuery.data ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} ({c.customerCode})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {customersQuery.isError ? (
+                <p className="text-sm text-destructive">{t("customersLoadError")}</p>
+              ) : null}
             </div>
 
             {/* File */}
@@ -452,6 +432,51 @@ export function TripImportClient() {
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               />
               <p className="text-xs text-muted-foreground">{t("fileHint")}</p>
+
+              {/* Expected-format helper (US: "how do I know the columns?"): a sample-CSV download + an
+                  inline column list. Both derive from STANDARD_IMPORT_TEMPLATE so they stay in lockstep
+                  with the mapping the worker applies. Guidance only — no validation change. */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Button type="button" variant="outline" size="sm" onClick={downloadSampleCsv}>
+                  {t("downloadSample")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-expanded={formatOpen}
+                  aria-controls="import-expected-format"
+                  onClick={() => setFormatOpen((open) => !open)}
+                >
+                  {formatOpen ? t("expectedFormatHide") : t("expectedFormatShow")}
+                </Button>
+              </div>
+
+              {formatOpen ? (
+                <div id="import-expected-format" className="rounded-md border bg-muted/30 p-3 text-sm">
+                  <p className="font-medium">{t("expectedFormatTitle")}</p>
+                  <p className="mt-1 text-muted-foreground">{t("expectedFormatSubtitle")}</p>
+                  <ul className="mt-3 space-y-1">
+                    {STANDARD_IMPORT_TEMPLATE.columnMappings.map((c) => (
+                      <li key={c.source} className="flex flex-wrap items-baseline gap-x-2">
+                        <code className="rounded bg-muted px-1 py-0.5 text-xs">{c.source}</code>
+                        {c.required ? (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {t("expectedFormatRequired")}
+                          </Badge>
+                        ) : null}
+                        <span className="text-muted-foreground">
+                          — {t(`expectedColumns.${c.source}.label`)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          ({t("expectedFormatExample")} {t(`expectedColumns.${c.source}.example`)})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-3 text-xs text-muted-foreground">{t("expectedFormatNote")}</p>
+                </div>
+              ) : null}
             </div>
 
             {uploadError ? (

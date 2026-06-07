@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
+import { inferFileType } from "@brazil-tms/shared";
 import { Conflict, handleRouteError } from "@/lib/api/respond";
 import { requireAuth, requirePermission } from "@/lib/auth/require-auth";
 import { createBatch, listBatches } from "@/lib/imports/import-batches-service";
 
 export const dynamic = "force-dynamic";
-
-/** Map a filename extension to the supported import file type, or null when unsupported. */
-function inferFileType(fileName: string): "csv" | "xlsx" | null {
-  const lower = fileName.toLowerCase();
-  if (lower.endsWith(".csv")) return "csv";
-  if (lower.endsWith(".xlsx")) return "xlsx";
-  return null;
-}
 
 /**
  * POST /api/imports — upload an import file (US1, FR-006/007/009). Fast path: authz → Storage put →

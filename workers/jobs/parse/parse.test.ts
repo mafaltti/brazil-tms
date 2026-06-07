@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import {
@@ -94,13 +95,16 @@ describe.skipIf(!hasDb)("parse job (integration)", () => {
     }
   });
 
-  async function seedBatch(): Promise<string> {
+  async function seedBatchWith(opts: {
+    templateId: string | null;
+    fileName: string;
+  }): Promise<string> {
     const batch = await db
       .insert(importBatches)
       .values({
         customerId,
-        templateId,
-        fileName: "trips.csv",
+        templateId: opts.templateId,
+        fileName: opts.fileName,
         storageKey: "pending",
         uploadedBy: actorId,
       })
@@ -111,6 +115,33 @@ describe.skipIf(!hasDb)("parse job (integration)", () => {
     await db.update(importBatches).set({ storageKey: key }).where(eq(importBatches.id, batchId));
     return batchId;
   }
+
+  function seedBatch(): Promise<string> {
+    return seedBatchWith({ templateId, fileName: "trips.csv" });
+  }
+
+  /** Build an XLSX buffer (header row + data rows) the parse worker reads via the .xlsx extension. */
+  async function buildXlsx(headers: string[], rows: string[][]): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Sheet1");
+    sheet.addRow(headers);
+    for (const row of rows) sheet.addRow(row);
+    const arrayBuffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(arrayBuffer as ArrayBuffer);
+  }
+
+  // The slice-013 standard headers (mirrors STANDARD_IMPORT_TEMPLATE.columnMappings, in order).
+  const STD_HEADERS = [
+    "id_viagem",
+    "origem",
+    "destino",
+    "janela_coleta_inicio",
+    "janela_coleta_fim",
+    "janela_entrega_inicio",
+    "janela_entrega_fim",
+    "tipo_veiculo",
+    "status",
+  ];
 
   it("parses CSV into import_rows with 1-based row_number, mapped fields, and total_rows", async () => {
     const csv = [
@@ -173,29 +204,105 @@ describe.skipIf(!hasDb)("parse job (integration)", () => {
     expect(batchRows[0]!.totalRows).toBe(0);
   });
 
-  it("a batch with no template fails with a documented message and inserts no rows", async () => {
-    const batch = await db
-      .insert(importBatches)
-      .values({
-        customerId,
-        templateId: null,
-        fileName: "no-template.csv",
-        storageKey: "pending",
-        uploadedBy: actorId,
-      })
-      .returning();
-    const batchId = batch[0]!.id;
-    createdBatchIds.push(batchId);
+  it("a batch with NO template is mapped via the standard format (slice 013 — no batch failure)", async () => {
+    const csv = [
+      STD_HEADERS.join(","),
+      "STD-1,ORIG,DEST,01/06/2026 08:00,01/06/2026 10:00,02/06/2026 08:00,02/06/2026 12:00,Truck,Novo",
+      "STD-2,ORIG,DEST,03/06/2026 08:00,03/06/2026 10:00,04/06/2026 08:00,04/06/2026 12:00,Carreta,Novo",
+    ].join("\n");
+
+    const batchId = await seedBatchWith({ templateId: null, fileName: "standard.csv" });
+    await putOriginal(batchId, Buffer.from(csv, "utf-8"), "text/csv");
 
     await runParse({ batchId, storageKey: originalStorageKey(batchId) });
 
+    const rows = await db
+      .select()
+      .from(importRows)
+      .where(eq(importRows.importBatchId, batchId))
+      .orderBy(asc(importRows.rowNumber));
+    expect(rows).toHaveLength(2);
+
+    const mapped0 = rows[0]!.mapped as Record<string, unknown>;
+    expect(mapped0.externalTripId).toBe("STD-1");
+    expect(mapped0.originCode).toBe("ORIG");
+    expect(mapped0.destinationCode).toBe("DEST");
+    expect(mapped0.plannedVehicleType).toBe("Truck");
+    expect(mapped0.statusLabel).toBe("Novo");
+    // Mapping did not throw → no per-row MAPPING_ERROR was recorded.
+    expect(rows[0]!.outcome).toBeNull();
+
     const batchRows = await db
-      .select({ status: importBatches.status, errorMessage: importBatches.errorMessage })
+      .select({
+        status: importBatches.status,
+        totalRows: importBatches.totalRows,
+        errorMessage: importBatches.errorMessage,
+      })
       .from(importBatches)
       .where(eq(importBatches.id, batchId))
       .limit(1);
-    expect(batchRows[0]!.status).toBe("failed");
-    expect(batchRows[0]!.errorMessage).toContain("modelo");
+    // The null-template path no longer fails the batch (FR-005); it advances exactly like a templated one.
+    expect(batchRows[0]!.status).not.toBe("failed");
+    expect(batchRows[0]!.errorMessage).toBeNull();
+    expect(batchRows[0]!.totalRows).toBe(2);
+  });
+
+  it("a no-template XLSX batch is parsed via the extension-chosen reader (slice 013)", async () => {
+    const bytes = await buildXlsx(STD_HEADERS, [
+      ["XL-1", "ORIG", "DEST", "01/06/2026 08:00", "01/06/2026 10:00", "02/06/2026 08:00", "02/06/2026 12:00", "Truck", "Novo"],
+    ]);
+
+    const batchId = await seedBatchWith({ templateId: null, fileName: "standard.xlsx" });
+    await putOriginal(
+      batchId,
+      bytes,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+
+    await runParse({ batchId, storageKey: originalStorageKey(batchId) });
+
+    const rows = await db
+      .select()
+      .from(importRows)
+      .where(eq(importRows.importBatchId, batchId))
+      .orderBy(asc(importRows.rowNumber));
+    expect(rows).toHaveLength(1);
+    const mapped0 = rows[0]!.mapped as Record<string, unknown>;
+    expect(mapped0.externalTripId).toBe("XL-1");
+    expect(mapped0.originCode).toBe("ORIG");
+    expect(mapped0.destinationCode).toBe("DEST");
+
+    const batchRows = await db
+      .select({ status: importBatches.status, totalRows: importBatches.totalRows })
+      .from(importBatches)
+      .where(eq(importBatches.id, batchId))
+      .limit(1);
+    expect(batchRows[0]!.status).not.toBe("failed");
+    expect(batchRows[0]!.totalRows).toBe(1);
+  });
+
+  it("a CSV with a leading UTF-8 BOM still maps the first column (Excel/sample exports)", async () => {
+    // The in-app sample download and most Excel/Sheets CSV exports prepend a BOM. Without bom-stripping
+    // the first header parses as "\uFEFFid_viagem" and externalTripId silently misses → MISSING_EXTERNAL_ID.
+    const csv = [
+      STD_HEADERS.join(","),
+      "BOM-1,ORIG,DEST,01/06/2026 08:00,01/06/2026 10:00,02/06/2026 08:00,02/06/2026 12:00,Truck,Novo",
+    ].join("\n");
+    const batchId = await seedBatchWith({ templateId: null, fileName: "bom.csv" });
+    await putOriginal(batchId, Buffer.from(`\uFEFF${csv}`, "utf-8"), "text/csv");
+
+    await runParse({ batchId, storageKey: originalStorageKey(batchId) });
+
+    const rows = await db
+      .select()
+      .from(importRows)
+      .where(eq(importRows.importBatchId, batchId))
+      .orderBy(asc(importRows.rowNumber));
+    expect(rows).toHaveLength(1);
+    const mapped0 = rows[0]!.mapped as Record<string, unknown>;
+    // The BOM must not corrupt the first header — externalTripId resolves from `id_viagem`.
+    expect(mapped0.externalTripId).toBe("BOM-1");
+    expect(mapped0.originCode).toBe("ORIG");
   });
 
   it("re-running parse is idempotent (retry-safe): no duplicate-key error, same row count", async () => {

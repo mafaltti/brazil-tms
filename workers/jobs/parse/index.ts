@@ -11,6 +11,8 @@ import {
 import { downloadObject } from "@brazil-tms/db/storage";
 import {
   applyTemplate,
+  inferFileType,
+  STANDARD_IMPORT_TEMPLATE,
   templateConfigSchema,
   type ParsePayload,
   type TemplateConfig,
@@ -62,6 +64,10 @@ function parseCsvBytes(bytes: Buffer): ParsedRecord[] {
     columns: true,
     skip_empty_lines: true,
     trim: true,
+    // Strip a leading UTF-8 BOM so the first header maps cleanly. Excel/Sheets exports (and the in-app
+    // sample download) commonly prepend a BOM; without this the first column key becomes "\uFEFFid_viagem"
+    // and the required external-id mapping silently misses → every row MISSING_EXTERNAL_ID.
+    bom: true,
   }) as Record<string, string>[];
   return rows.map((raw, index) => ({ rowNumber: index + 1, raw }));
 }
@@ -131,29 +137,42 @@ export async function runParse(payload: ParsePayload): Promise<void> {
     return;
   }
 
-  if (!batch.templateId) {
-    await setBatchFailed(batchId, "Nenhum modelo de importação selecionado.");
-    return;
-  }
-
-  const templateRows = await db
-    .select()
-    .from(importTemplates)
-    .where(eq(importTemplates.id, batch.templateId))
-    .limit(1);
-  const templateRow = templateRows[0];
-  if (!templateRow) {
-    await setBatchFailed(batchId, "Nenhum modelo de importação selecionado.");
-    return;
-  }
-
+  // Resolve the mapping config. Slice 013: a batch with no template (the operator path) is mapped with
+  // the in-code STANDARD_IMPORT_TEMPLATE — no batch fails for "no template" anymore. The templateId path
+  // (the dormant per-customer API) is kept intact for when real signed-off configs arrive.
   let template: TemplateConfig;
-  try {
-    template = toTemplateConfig(templateRow);
-  } catch (err) {
+  if (batch.templateId) {
+    const templateRows = await db
+      .select()
+      .from(importTemplates)
+      .where(eq(importTemplates.id, batch.templateId))
+      .limit(1);
+    const templateRow = templateRows[0];
+    if (!templateRow) {
+      await setBatchFailed(batchId, "Nenhum modelo de importação selecionado.");
+      return;
+    }
+    try {
+      template = toTemplateConfig(templateRow);
+    } catch (err) {
+      await setBatchFailed(
+        batchId,
+        `Configuração do modelo de importação inválida: ${(err as Error).message}`,
+      );
+      return;
+    }
+  } else {
+    template = STANDARD_IMPORT_TEMPLATE;
+  }
+
+  // Choose CSV vs XLSX from the uploaded file's name extension (slice 013) — the single canonical rule
+  // the BFF already applied at upload — not a stored template attribute. `null` should never reach here
+  // (the BFF rejects unsupported types); fail defensively with the unreadable-file message if it does.
+  const fileType = inferFileType(batch.fileName);
+  if (!fileType) {
     await setBatchFailed(
       batchId,
-      `Configuração do modelo de importação inválida: ${(err as Error).message}`,
+      "Falha ao ler o arquivo de importação: tipo de arquivo não suportado (use .csv ou .xlsx).",
     );
     return;
   }
@@ -162,10 +181,7 @@ export async function runParse(payload: ParsePayload): Promise<void> {
   let records: ParsedRecord[];
   try {
     const bytes = await downloadObject(storageKey);
-    records =
-      template.fileType === "xlsx"
-        ? await parseXlsxBytes(bytes)
-        : parseCsvBytes(bytes);
+    records = fileType === "xlsx" ? await parseXlsxBytes(bytes) : parseCsvBytes(bytes);
   } catch (err) {
     await setBatchFailed(
       batchId,
