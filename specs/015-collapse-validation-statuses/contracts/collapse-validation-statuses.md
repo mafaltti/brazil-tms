@@ -112,6 +112,15 @@ DELETE /api/trips/:id/assignment      → unassignTrip   (assigned → received;
 POST /api/trips/:id/assignment/confirm → UNCHANGED (confirmTripAssignment)
 ```
 
+**Hardening (review follow-up):** the generic `POST /api/trips/:id/status` route (`update_trip_status`,
+execution milestones) now REJECTS an assignment-phase `toStatus` ∈ {`received`, `assigned`, `confirmed`}
+with `409 USE_ASSIGNMENT_ENDPOINT`. Those states must be entered through the dedicated assignment/confirm
+endpoints above, which enforce `assign_resources`, run eligibility, and write the `trip_assignments` row.
+This closes a pre-existing gap (the legal table edge `received → assigned` was reachable via the generic
+`transitionTripStatus`, minting a structurally inconsistent `assigned` trip with no assignment row and
+skipping `assign_resources`). The status machine table is unchanged — the edge stays legal for
+`assignTrip`; only this route refuses to perform it.
+
 ## 6. Dispatch board query — contract
 
 **Module**: `apps/web/components/trips/dispatch/dispatch-board.tsx` (client constant); consumed by

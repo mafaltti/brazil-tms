@@ -91,31 +91,60 @@ test.afterAll(async () => {
 
 test.describe("007 authz — update_trip_status (milestones + notes)", () => {
   test("holder (Dispatcher) 200, non-holder (Finance) 403, unauthenticated 401", async ({ request }) => {
-    const tripId = await seedTrip("received");
+    // Seed at `confirmed` and drive a genuine EXECUTION MILESTONE (`confirmed → at_origin`) — the
+    // status route's documented purpose. NOT an assignment-phase transition: `received → assigned`
+    // must go through the assignment route (assign_resources + eligibility + a trip_assignments row),
+    // so exercising it here would sanction a bypass.
+    const tripId = await seedTrip("confirmed");
 
     // Unauthenticated → 401.
     const noAuth = await request.post(`/api/trips/${tripId}/status`, {
-      data: { expectedFromStatus: "received", toStatus: "assigned" },
+      data: { expectedFromStatus: "confirmed", toStatus: "at_origin" },
     });
     expect(noAuth.status()).toBe(401);
 
     // Holder (Dispatcher) → 200 on status + note.
     await apiLogin(request, testAccounts.dispatcher);
     const status = await request.post(`/api/trips/${tripId}/status`, {
-      data: { expectedFromStatus: "received", toStatus: "assigned" },
+      data: { expectedFromStatus: "confirmed", toStatus: "at_origin" },
     });
     expect(status.status()).toBe(200);
     const note = await request.post(`/api/trips/${tripId}/events`, { data: { notes: "ok" } });
     expect(note.status()).toBe(200);
 
-    // Non-holder (Finance) → 403 on status + note.
+    // Non-holder (Finance) → 403 on status + note (rejected at the permission gate, before any transition).
     await apiLogin(request, testAccounts.nonAdmin);
     const status403 = await request.post(`/api/trips/${tripId}/status`, {
-      data: { expectedFromStatus: "assigned", toStatus: "confirmed" },
+      data: { expectedFromStatus: "at_origin", toStatus: "in_transit" },
     });
     expect(status403.status()).toBe(403);
     const note403 = await request.post(`/api/trips/${tripId}/events`, { data: { notes: "x" } });
     expect(note403.status()).toBe(403);
+  });
+
+  test("update_trip_status cannot enter an assignment-phase state via /status (no assign_resources bypass)", async ({
+    request,
+  }) => {
+    // Dispatcher holds update_trip_status but NOT assign_resources. `received → assigned` is a legal
+    // table edge, but it MUST go through the assignment route (which enforces assign_resources, runs
+    // eligibility, and writes a trip_assignments row). The generic status route rejects it so an
+    // update_trip_status-only holder can't mint a structurally inconsistent "assigned" trip.
+    const tripId = await seedTrip("received");
+    await apiLogin(request, testAccounts.dispatcher);
+
+    const res = await request.post(`/api/trips/${tripId}/status`, {
+      data: { expectedFromStatus: "received", toStatus: "assigned" },
+    });
+    expect(res.status()).toBe(409);
+    expect((await res.json()).error.code).toBe("USE_ASSIGNMENT_ENDPOINT");
+
+    // No state change: the trip is still `received` and no assignment row was created.
+    const rows = await db
+      .select({ s: trips.currentStatus })
+      .from(trips)
+      .where(eq(trips.id, tripId))
+      .limit(1);
+    expect(rows[0]!.s).toBe("received");
   });
 });
 
