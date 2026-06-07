@@ -74,14 +74,10 @@ async function seedTrip(): Promise<string> {
   return id;
 }
 
-/** Drive received → confirmed (validate, assign, confirm) so milestones are reachable. */
+/** Drive received → confirmed (assign, confirm) so milestones are reachable. */
 async function toConfirmed(request: APIRequestContext, tripId: string): Promise<void> {
-  let res = await request.post(`/api/trips/${tripId}/status`, {
-    data: { expectedFromStatus: "received", toStatus: "validated" },
-  });
-  expect(res.ok(), "received→validated").toBeTruthy();
-  res = await request.post(`/api/trips/${tripId}/assignment`, {
-    data: { driverId, vehicleId, expectedFromStatus: "validated", overrideReason: "e2e" },
+  let res = await request.post(`/api/trips/${tripId}/assignment`, {
+    data: { driverId, vehicleId, expectedFromStatus: "received", overrideReason: "e2e" },
   });
   expect(res.ok(), "assign").toBeTruthy();
   res = await request.post(`/api/trips/${tripId}/assignment/confirm`, {
@@ -167,31 +163,27 @@ test.describe("007 US1 — execution timeline", () => {
   test("a free-form note appears without a status change", async ({ request }) => {
     await apiLogin(request, testAccounts.dispatcher);
     const tripId = await seedTrip();
-    let res = await request.post(`/api/trips/${tripId}/status`, {
-      data: { expectedFromStatus: "received", toStatus: "validated" },
-    });
-    expect(res.ok()).toBeTruthy();
 
-    res = await request.post(`/api/trips/${tripId}/events`, { data: { notes: "Observação de execução." } });
+    const res = await request.post(`/api/trips/${tripId}/events`, { data: { notes: "Observação de execução." } });
     expect(res.ok()).toBeTruthy();
 
     const detail = await request.get(`/api/trips/${tripId}`);
     const { item } = (await detail.json()) as {
       item: { currentStatus: string; events: { eventType: string; notes: string | null }[] };
     };
-    expect(item.currentStatus).toBe("validated");
+    expect(item.currentStatus).toBe("received");
     expect(item.events.some((e) => e.eventType === "note" && e.notes === "Observação de execução.")).toBe(true);
   });
 
   test("an illegal jump (Loaded before At Origin) → 409 ILLEGAL_TRANSITION", async ({ request }) => {
     await apiLogin(request, testAccounts.dispatcher);
     const tripId = await seedTrip();
-    await request.post(`/api/trips/${tripId}/status`, {
-      data: { expectedFromStatus: "received", toStatus: "validated" },
+    await request.post(`/api/trips/${tripId}/assignment`, {
+      data: { driverId, vehicleId, expectedFromStatus: "received", overrideReason: "e2e" },
     });
 
     const res = await request.post(`/api/trips/${tripId}/status`, {
-      data: { expectedFromStatus: "validated", toStatus: "loaded" },
+      data: { expectedFromStatus: "assigned", toStatus: "loaded" },
     });
     expect(res.status()).toBe(409);
     const body = (await res.json()) as { error: { code: string } };
@@ -204,7 +196,7 @@ test.describe("007 US1 — execution timeline", () => {
     // Finance lacks update_trip_status.
     await apiLogin(request, testAccounts.nonAdmin);
     const status = await request.post(`/api/trips/${tripId}/status`, {
-      data: { expectedFromStatus: "received", toStatus: "validated" },
+      data: { expectedFromStatus: "received", toStatus: "cancelled" },
     });
     expect(status.status()).toBe(403);
     const note = await request.post(`/api/trips/${tripId}/events`, { data: { notes: "x" } });

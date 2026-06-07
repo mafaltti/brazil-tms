@@ -77,7 +77,7 @@ describe.skipIf(!hasDb)("assignment-override (integration)", () => {
   const input = (over: Partial<AssignTripInput>): AssignTripInput => ({
     driverId: goodDriverId,
     vehicleId: vanVehicleId,
-    expectedFromStatus: "validated",
+    expectedFromStatus: "received",
     ...over,
   });
 
@@ -155,7 +155,7 @@ describe.skipIf(!hasDb)("assignment-override (integration)", () => {
   });
 
   it("refuses with OVERRIDE_REQUIRED (and attaches the warn findings) when a WARN has no reason", async () => {
-    const tripId = await insertTrip("validated");
+    const tripId = await insertTrip("received");
     let caught: unknown;
     try {
       await assignTrip(tripId, input({}), actorId); // van vs truck ⇒ type_mismatch WARN, no reason.
@@ -171,17 +171,17 @@ describe.skipIf(!hasDb)("assignment-override (integration)", () => {
     expect(details.some((f) => f.code === "type_mismatch" && f.severity === "warn")).toBe(true);
     expect(details.every((f) => f.severity === "warn")).toBe(true);
 
-    // Refused ⇒ NO state change: trip still validated, no assignment row.
+    // Refused ⇒ NO state change: trip still received, no assignment row.
     expect(
       (await db.select().from(trips).where(eq(trips.id, tripId)).limit(1))[0]!.currentStatus,
-    ).toBe("validated");
+    ).toBe("received");
     expect(await db.select().from(tripAssignments).where(eq(tripAssignments.tripId, tripId))).toHaveLength(
       0,
     );
   });
 
   it("treats a BLOCK as absolute — an override reason does NOT bypass ASSIGNMENT_BLOCKED", async () => {
-    const tripId = await insertTrip("validated");
+    const tripId = await insertTrip("received");
     let caught: unknown;
     try {
       await assignTrip(
@@ -200,11 +200,11 @@ describe.skipIf(!hasDb)("assignment-override (integration)", () => {
 
     expect(
       (await db.select().from(trips).where(eq(trips.id, tripId)).limit(1))[0]!.currentStatus,
-    ).toBe("validated");
+    ).toBe("received");
   });
 
   it("proceeds when a WARN is overridden with a reason — persists override_reason + audits the reason", async () => {
-    const tripId = await insertTrip("validated");
+    const tripId = await insertTrip("received");
     const reason = "Veículo van aprovado pelo cliente para esta carga leve";
     const { trip, findings } = await assignTrip(tripId, input({ overrideReason: reason }), actorId);
 

@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { TripStatus } from "@brazil-tms/shared";
 import { customers } from "./customers";
 import { locations } from "./locations";
 import { lanes } from "./lanes";
@@ -58,7 +59,9 @@ export const trips = pgTable(
       .notNull()
       .references(() => locations.id),
     laneId: uuid("lane_id").references(() => lanes.id),
-    currentStatus: tripStatus("current_status").notNull().default("received"),
+    // slice 015: `.$type<TripStatus>()` pins the column to the 16-value active machine (type-only; the
+    // pgEnum still has 18 physical members, 2 dormant). No generated SQL diff.
+    currentStatus: tripStatus("current_status").notNull().default("received").$type<TripStatus>(),
     slaStatus: text("sla_status"),
     // feature 007 — server-computed SLA risk (D4): `sla_status` stays text (CHECK-validated, no enum);
     // `sla_reasons` is the schema's first `.array()` column (text[]). Both written atomically.
@@ -78,7 +81,7 @@ export const trips = pgTable(
     cancellationResponsibleParty: cancellationResponsibleParty("cancellation_responsible_party"),
     cancellationBillingImpact: text("cancellation_billing_impact"),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
-    disputedFromStatus: tripStatus("disputed_from_status"),
+    disputedFromStatus: tripStatus("disputed_from_status").$type<TripStatus>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

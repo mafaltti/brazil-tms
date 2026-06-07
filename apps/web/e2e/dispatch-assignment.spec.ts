@@ -19,15 +19,15 @@ import { testAccounts } from "./test-config";
  * US1 (Assign & confirm) — feature 006 dispatch assignment, driven against the running app (T038).
  *
  * Authorized assigner: Operations Manager (`assign_resources`, fully onboarded; the seeded Admin is
- * `must_change_password=true` so it cannot API sign-in). On a `validated` trip we assign driver +
- * vehicle (+ carrier) via `POST /api/trips/:id/assignment` (`expectedFromStatus="validated"` ⇒ assign):
+ * `must_change_password=true` so it cannot API sign-in). On a `received` trip we assign driver +
+ * vehicle (+ carrier) via `POST /api/trips/:id/assignment` (`expectedFromStatus="received"` ⇒ assign):
  * the trip becomes `assigned`, exactly one current assignment is recorded with assigned-by/at + notes,
  * the `GET /api/trips/:id` detail returns that `currentAssignment`, and the `trip.assign` audit row is
  * present. Confirm via `…/assignment/confirm` ⇒ `confirmed` + a confirmation timestamp + `trip.confirm`
  * audit. The partial-assignment guard (driver only, no vehicle) returns `409 INCOMPLETE_ASSIGNMENT`.
  *
  * Self-seeds via `@brazil-tms/db` (a Playwright spec cannot import the `server-only` services): one
- * customer + two locations + OWNED, active, in-document driver/vehicle/carrier + a fresh `validated`
+ * customer + two locations + OWNED, active, in-document driver/vehicle/carrier + a fresh `received`
  * trip per test (idempotent, unique ids, FK-safe cleanup). Requires DATABASE_URL for the test process.
  */
 
@@ -74,8 +74,8 @@ const tripIds: string[] = [];
 // window must NOT intersect a later trip's window (otherwise a schedule_overlap WARN would fire).
 let windowDay = 1;
 
-/** A fresh `validated` trip with a unique planned window + matching vehicle type (so no warnings fire). */
-async function seedValidatedTrip(plannedVehicleType = "truck"): Promise<string> {
+/** A fresh `received` trip with a unique planned window + matching vehicle type (so no warnings fire). */
+async function seedReceivedTrip(plannedVehicleType = "truck"): Promise<string> {
   const day = String(windowDay++).padStart(2, "0");
   const inserted = await db
     .insert(trips)
@@ -84,7 +84,7 @@ async function seedValidatedTrip(plannedVehicleType = "truck"): Promise<string> 
       externalTripId: code("EXT-ASSIGN"),
       originLocationId: originId,
       destinationLocationId: destId,
-      currentStatus: "validated",
+      currentStatus: "received",
       originalPlan: { customerId, originLocationId: originId, destinationLocationId: destId },
       plannedVehicleType,
       plannedPickupWindowStart: new Date(`2026-07-${day}T08:00:00.000Z`),
@@ -181,14 +181,14 @@ test.describe("US1 — assign & confirm the resources that will run a trip", () 
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
 
     const assign = await ctx.post(`/api/trips/${tripId}/assignment`, {
       data: {
         driverId,
         vehicleId,
         carrierId,
-        expectedFromStatus: "validated",
+        expectedFromStatus: "received",
         notes: "Atribuição de teste US1",
       },
     });
@@ -238,10 +238,10 @@ test.describe("US1 — assign & confirm the resources that will run a trip", () 
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
 
     const assign = await ctx.post(`/api/trips/${tripId}/assignment`, {
-      data: { driverId, vehicleId, carrierId, expectedFromStatus: "validated" },
+      data: { driverId, vehicleId, carrierId, expectedFromStatus: "received" },
     });
     expect(assign.status()).toBe(200);
 
@@ -272,14 +272,14 @@ test.describe("US1 — assign & confirm the resources that will run a trip", () 
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
 
     // Missing vehicleId fails the Zod required check (400) — so to exercise INCOMPLETE_ASSIGNMENT we
     // send a valid body whose vehicle is absent at the service layer. The schema requires both
     // driverId AND vehicleId, so an only-driver body is a 400. Drive the server guard with the
     // dedicated nullable check below instead.
     const onlyDriver = await ctx.post(`/api/trips/${tripId}/assignment`, {
-      data: { driverId, expectedFromStatus: "validated" },
+      data: { driverId, expectedFromStatus: "received" },
     });
     // `assignTripSchema` requires `vehicleId` ⇒ this is a Zod 400 (the boundary rejects it first).
     expect(onlyDriver.status()).toBe(400);
@@ -289,7 +289,7 @@ test.describe("US1 — assign & confirm the resources that will run a trip", () 
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
 
     // A subcontracted driver+vehicle require a carrier (derived from ownership_type) — the service
     // guard fires INCOMPLETE_ASSIGNMENT when the carrier is absent. Seed a dedicated subcontracted
@@ -331,7 +331,7 @@ test.describe("US1 — assign & confirm the resources that will run a trip", () 
         data: {
           driverId: subDriver[0]!.id,
           vehicleId: subVehicle[0]!.id,
-          expectedFromStatus: "validated",
+          expectedFromStatus: "received",
         },
       });
       expect(res.status()).toBe(409);

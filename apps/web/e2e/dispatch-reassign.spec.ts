@@ -17,13 +17,13 @@ import { testAccounts } from "./test-config";
 /**
  * US4 (Reassign / substitute, retaining history) — feature 006, driven against the running app (T056).
  *
- * `POST /api/trips/:id/assignment` branches on `expectedFromStatus`: `validated` ⇒ assign;
+ * `POST /api/trips/:id/assignment` branches on `expectedFromStatus`: `received` ⇒ assign;
  * `assigned`/`confirmed` ⇒ reassign (supersede the current row, NO status change). After a reassign the
  * trip has EXACTLY ONE current assignment (the new resources) and the prior one is retained as
  * superseded history (`assignmentHistory`, with `supersededAt`). `DELETE …/assignment` un-assigns:
- * `assigned → validated`, prior current row retained as history.
+ * `assigned → received`, prior current row retained as history.
  *
- * Self-seeds OWNED, clean resources (so no findings interfere) + a `validated` trip. FK-safe cleanup.
+ * Self-seeds OWNED, clean resources (so no findings interfere) + a `received` trip. FK-safe cleanup.
  */
 
 const ADMIN_EMAIL = "admin@braziltransports.com.br";
@@ -61,7 +61,7 @@ let vehicleA = "";
 let vehicleB = "";
 const tripIds: string[] = [];
 
-async function seedValidatedTrip(): Promise<string> {
+async function seedReceivedTrip(): Promise<string> {
   const inserted = await db
     .insert(trips)
     .values({
@@ -69,7 +69,7 @@ async function seedValidatedTrip(): Promise<string> {
       externalTripId: code("EXT-REASSIGN"),
       originLocationId: originId,
       destinationLocationId: destId,
-      currentStatus: "validated",
+      currentStatus: "received",
       originalPlan: { customerId, originLocationId: originId, destinationLocationId: destId },
       plannedVehicleType: "truck",
       plannedPickupWindowStart: new Date("2026-10-01T08:00:00.000Z"),
@@ -154,16 +154,16 @@ test.afterAll(async () => {
   if (customerId) await db.delete(customers).where(eq(customers.id, customerId));
 });
 
-test.describe("US4 — reassign supersedes + retains history; unassign returns to validated", () => {
+test.describe("US4 — reassign supersedes + retains history; unassign returns to received", () => {
   test("assign then reassign → exactly one current (new), prior in the retained history chain", async ({
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
 
-    // 1) Assign driver A + vehicle A (validated → assigned).
+    // 1) Assign driver A + vehicle A (received → assigned).
     const assign = await ctx.post(`/api/trips/${tripId}/assignment`, {
-      data: { driverId: driverA, vehicleId: vehicleA, expectedFromStatus: "validated" },
+      data: { driverId: driverA, vehicleId: vehicleA, expectedFromStatus: "received" },
     });
     expect(assign.status()).toBe(200);
 
@@ -208,14 +208,14 @@ test.describe("US4 — reassign supersedes + retains history; unassign returns t
     expect(r.item.audit.some((x) => x.action === "trip.reassign")).toBe(true);
   });
 
-  test("unassign an assigned trip → validated, prior assignment retained as history", async ({
+  test("unassign an assigned trip → received, prior assignment retained as history", async ({
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
 
     const assign = await ctx.post(`/api/trips/${tripId}/assignment`, {
-      data: { driverId: driverA, vehicleId: vehicleA, expectedFromStatus: "validated" },
+      data: { driverId: driverA, vehicleId: vehicleA, expectedFromStatus: "received" },
     });
     expect(assign.status()).toBe(200);
 
@@ -233,7 +233,7 @@ test.describe("US4 — reassign supersedes + retains history; unassign returns t
         audit: Array<{ action: string }>;
       };
     };
-    expect(item.currentStatus).toBe("validated");
+    expect(item.currentStatus).toBe("received");
     expect(item.currentAssignment).toBeNull();
     // The prior assignment is retained (superseded), never deleted.
     expect(item.assignmentHistory.length).toBe(1);

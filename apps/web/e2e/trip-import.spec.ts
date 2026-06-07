@@ -185,13 +185,14 @@ test.describe("US1/US3 — upload fast path (predefined standard format)", () =>
   });
 });
 
-test.describe("US1 — imported trips are born validated (slice 014)", () => {
+test.describe("US1 — imported trips are born received (slice 015)", () => {
   // The e2e webServer boots ONLY the Next app (no worker), so the worker-driven import→confirm path
-  // cannot run here — that a confirm-created trip is born `validated` is asserted in the worker
+  // cannot run here — that a confirm-created trip is born `received` is asserted in the worker
   // integration test (workers/jobs/confirm-import/confirm.test.ts). What this e2e pins is the
-  // operator-facing surface: a confirm-created (born-`validated`) import trip shows status "Validada"
-  // (not "Recebida") on the Control Tower, so it is dispatch-ready. Seeded directly via @brazil-tms/db,
-  // mirroring the dispatch e2e.
+  // operator-facing surface: slice 015 collapsed the validation states, so a confirm-created
+  // (born-`received`) import trip shows status "Recebida" on the Control Tower and is itself
+  // dispatch-ready (no separate "Validada" hop). Seeded directly via @brazil-tms/db, mirroring the
+  // dispatch e2e.
   const ADMIN_EMAIL = "admin@braziltransports.com.br";
   let customerId = "";
   let originId = "";
@@ -242,7 +243,7 @@ test.describe("US1 — imported trips are born validated (slice 014)", () => {
       .returning({ id: importBatches.id });
     batchId = batch[0]!.id;
 
-    // A confirm-created import trip: born `validated` (slice 014), linked to its batch.
+    // A confirm-created import trip: born `received` (slice 015), linked to its batch.
     externalId = code("EXT-014");
     const trip = await db
       .insert(trips)
@@ -252,7 +253,7 @@ test.describe("US1 — imported trips are born validated (slice 014)", () => {
         importBatchId: batchId,
         originLocationId: originId,
         destinationLocationId: destId,
-        currentStatus: "validated",
+        currentStatus: "received",
         originalPlan: { customerId, originLocationId: originId, destinationLocationId: destId },
       })
       .returning({ id: trips.id });
@@ -271,7 +272,7 @@ test.describe("US1 — imported trips are born validated (slice 014)", () => {
     if (customerId) await db.delete(customers).where(eq(customers.id, customerId));
   });
 
-  test("a confirm-created import trip shows status 'Validada' on the Control Tower (not 'Recebida')", async ({
+  test("a confirm-created import trip shows status 'Recebida' on the Control Tower (not 'Validada')", async ({
     page,
   }) => {
     await signIn(page, testAccounts.opsManager);
@@ -279,8 +280,9 @@ test.describe("US1 — imported trips are born validated (slice 014)", () => {
 
     const row = page.getByRole("row", { name: new RegExp(externalId) });
     await expect(row).toBeVisible({ timeout: 15_000 });
-    // The status badge shows "Validada" — imported trips are dispatch-ready, not stranded at "Recebida".
-    await expect(row.getByText("Validada")).toBeVisible();
-    await expect(row.getByText("Recebida")).toHaveCount(0);
+    // Slice 015: the status badge shows "Recebida" — imported trips are dispatch-ready at `received`
+    // itself; the separate "Validada" hop was collapsed away.
+    await expect(row.getByText("Recebida")).toBeVisible();
+    await expect(row.getByText("Validada")).toHaveCount(0);
   });
 });

@@ -26,9 +26,10 @@ import type { AssignTripInput, TripStatus } from "@brazil-tms/shared";
  *   $env:DATABASE_URL='postgres://postgres:postgres@localhost:5433/postgres'
  *   pnpm exec vitest run --project web apps/web/lib/trips/trip-assignments.test.ts
  *
- * Focus (T036/T037): the assign happy path (`validated→assigned` + exactly one `is_current` row +
- * `assigned_by/at` + notes + ONE `trip.assign` audit), `INCOMPLETE_ASSIGNMENT` (driver only),
- * `STALE_TRANSITION` (assign when not `validated`), `confirmTripAssignment` (`assigned→confirmed` +
+ * Focus (T036/T037): the assign happy path (`received→assigned` + exactly one `is_current` row +
+ * `assigned_by/at` + notes + ONE `trip.assign` audit; slice 015 retargeted the source off the removed
+ * `validated` state), `INCOMPLETE_ASSIGNMENT` (driver only),
+ * `STALE_TRANSITION` (assign when not `received`), `confirmTripAssignment` (`assigned→confirmed` +
  * `confirmed_by/at` + ONE `trip.confirm` audit), and the single-current-assignment integrity guard —
  * a second `is_current=true` INSERT for the same trip raises SQLSTATE `23505` (asserted via the
  * `error.cause.code` walk, since a `DrizzleQueryError` wraps the pg error).
@@ -105,7 +106,7 @@ describe.skipIf(!hasDb)("trip-assignments (integration)", () => {
   const fullInput = (overrides: Partial<AssignTripInput> = {}): AssignTripInput => ({
     driverId,
     vehicleId,
-    expectedFromStatus: "validated",
+    expectedFromStatus: "received",
     ...overrides,
   });
 
@@ -200,8 +201,8 @@ describe.skipIf(!hasDb)("trip-assignments (integration)", () => {
     }
   });
 
-  it("assigns a validated trip → assigned, one is_current row, assigned_by/at + notes, one trip.assign audit", async () => {
-    const tripId = await insertTrip("validated");
+  it("assigns a received trip → assigned, one is_current row, assigned_by/at + notes, one trip.assign audit", async () => {
+    const tripId = await insertTrip("received");
     const { trip, findings } = await assignTrip(
       tripId,
       fullInput({ notes: "Carga prioritária" }),
@@ -241,37 +242,40 @@ describe.skipIf(!hasDb)("trip-assignments (integration)", () => {
       .from(tripEvents)
       .where(and(eq(tripEvents.tripId, tripId), eq(tripEvents.eventType, "status_change")));
     expect(events).toHaveLength(1);
-    expect(events[0]!.statusBefore).toBe("validated");
+    expect(events[0]!.statusBefore).toBe("received");
     expect(events[0]!.statusAfter).toBe("assigned");
   });
 
   it("rejects a driver-only assignment with INCOMPLETE_ASSIGNMENT (vehicle required)", async () => {
-    const tripId = await insertTrip("validated");
-    const driverOnly = { driverId, expectedFromStatus: "validated" } as unknown as AssignTripInput;
+    const tripId = await insertTrip("received");
+    const driverOnly = { driverId, expectedFromStatus: "received" } as unknown as AssignTripInput;
     await expect(assignTrip(tripId, driverOnly, actorId)).rejects.toMatchObject({
       code: "INCOMPLETE_ASSIGNMENT",
     });
     await expect(assignTrip(tripId, driverOnly, actorId)).rejects.toBeInstanceOf(Conflict);
     // No state changed: the trip is untouched and no assignment row was written.
     const rows = await db.select().from(trips).where(eq(trips.id, tripId)).limit(1);
-    expect(rows[0]!.currentStatus).toBe("validated");
+    expect(rows[0]!.currentStatus).toBe("received");
     const asg = await db.select().from(tripAssignments).where(eq(tripAssignments.tripId, tripId));
     expect(asg).toHaveLength(0);
   });
 
-  it("rejects assigning a trip that is not validated with STALE_TRANSITION", async () => {
-    // The trip is at `received`; the guarded UPDATE ... WHERE current_status='validated' matches 0 rows.
-    const tripId = await insertTrip("received");
+  it("rejects assigning a trip that is not received with STALE_TRANSITION", async () => {
+    // slice 015: assign guards `WHERE current_status='received'`. Seed the trip ALREADY `assigned`
+    // (a genuinely non-`received` status) so the guarded UPDATE matches 0 rows → STALE_TRANSITION.
+    // (Before the collapse this case seeded `received` against a `validated` guard; `received` is now
+    // the assignable source, so the stale source had to move off it.)
+    const tripId = await insertTrip("assigned");
     await expect(assignTrip(tripId, fullInput(), actorId)).rejects.toMatchObject({
       code: "STALE_TRANSITION",
     });
     expect(
       (await db.select().from(trips).where(eq(trips.id, tripId)).limit(1))[0]!.currentStatus,
-    ).toBe("received");
+    ).toBe("assigned");
   });
 
   it("confirms an assigned trip → confirmed, sets confirmed_by/at, writes one trip.confirm audit", async () => {
-    const tripId = await insertTrip("validated");
+    const tripId = await insertTrip("received");
     await assignTrip(tripId, fullInput(), actorId);
 
     const { trip } = await confirmTripAssignment(
@@ -311,7 +315,7 @@ describe.skipIf(!hasDb)("trip-assignments (integration)", () => {
   // the same trip must violate the partial-unique index `trip_assignments_trip_active_uq` (SQLSTATE
   // 23505). We assert via the cause-chain walk because a DrizzleQueryError wraps the pg error.
   it("raises SQLSTATE 23505 on a second is_current=true insert for the same trip (partial-unique guard)", async () => {
-    const tripId = await insertTrip("validated");
+    const tripId = await insertTrip("received");
     await assignTrip(tripId, fullInput(), actorId); // first current row (via the service).
 
     let caught: unknown;

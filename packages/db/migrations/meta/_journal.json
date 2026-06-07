@@ -57,6 +57,13 @@
       "when": 1780290642599,
       "tag": "0007_nebulous_xorn",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1780862362250,
+      "tag": "0008_collapse_validation_statuses",
+      "breakpoints": true
     }
   ]
 }

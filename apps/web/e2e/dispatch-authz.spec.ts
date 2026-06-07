@@ -26,7 +26,7 @@ import { testAccounts } from "./test-config";
  * The e2e seed provisions no Control Tower / Executive Viewer account, so Finance is the available
  * view-only-but-not-assign role (mirrors trips-control-tower.spec.ts using Finance for the read re-gate).
  *
- * Self-seeds OWNED clean resources + `validated` trips. FK-safe cleanup; unique ids.
+ * Self-seeds OWNED clean resources + `received` trips. FK-safe cleanup; unique ids.
  */
 
 const ADMIN_EMAIL = "admin@braziltransports.com.br";
@@ -67,7 +67,7 @@ const tripIds: string[] = [];
 // 200-on-assign tests, so a later trip must not intersect an earlier (now-assigned) one's window.
 let windowDay = 1;
 
-async function seedValidatedTrip(): Promise<string> {
+async function seedReceivedTrip(): Promise<string> {
   const day = String(windowDay++).padStart(2, "0");
   const inserted = await db
     .insert(trips)
@@ -76,7 +76,7 @@ async function seedValidatedTrip(): Promise<string> {
       externalTripId: code("EXT-AUTHZ"),
       originLocationId: originId,
       destinationLocationId: destId,
-      currentStatus: "validated",
+      currentStatus: "received",
       originalPlan: { customerId, originLocationId: originId, destinationLocationId: destId },
       plannedVehicleType: "truck",
       plannedPickupWindowStart: new Date(`2026-11-${day}T08:00:00.000Z`),
@@ -152,27 +152,27 @@ test.afterAll(async () => {
 
 test.describe("006 authz — assign_resources holders may write", () => {
   test("no session → assign is 401", async ({ request }) => {
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
     const res = await request.post(`/api/trips/${tripId}/assignment`, {
-      data: { driverId, vehicleId, expectedFromStatus: "validated" },
+      data: { driverId, vehicleId, expectedFromStatus: "received" },
     });
     expect(res.status()).toBe(401);
   });
 
   test("Operations Manager (assign_resources) → 200 on assign", async ({ request }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
     const res = await ctx.post(`/api/trips/${tripId}/assignment`, {
-      data: { driverId, vehicleId, expectedFromStatus: "validated" },
+      data: { driverId, vehicleId, expectedFromStatus: "received" },
     });
     expect(res.status()).toBe(200);
   });
 
   test("Dispatcher (assign_resources) → 200 on assign", async ({ request }) => {
     const ctx = await apiLogin(request, testAccounts.dispatcher);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
     const res = await ctx.post(`/api/trips/${tripId}/assignment`, {
-      data: { driverId, vehicleId, expectedFromStatus: "validated" },
+      data: { driverId, vehicleId, expectedFromStatus: "received" },
     });
     expect(res.status()).toBe(200);
   });
@@ -183,8 +183,8 @@ test.describe("006 authz — Finance (no assign_resources) is 403 on every write
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.nonAdmin);
-    const tripId = await seedValidatedTrip();
-    const validBody = { driverId, vehicleId, expectedFromStatus: "validated" };
+    const tripId = await seedReceivedTrip();
+    const validBody = { driverId, vehicleId, expectedFromStatus: "received" };
 
     // POST (assign OR reassign — both gated `assign_resources`).
     expect((await ctx.post(`/api/trips/${tripId}/assignment`, { data: validBody })).status()).toBe(
@@ -211,13 +211,13 @@ test.describe("006 authz — Finance (no assign_resources) is 403 on every write
       (await ctx.post(`/api/trips/${tripId}/assignment/check`, { data: { driverId, vehicleId } })).status(),
     ).toBe(403);
 
-    // Authorization is checked before any mutation → no state change (the trip stays validated/unassigned).
+    // Authorization is checked before any mutation → no state change (the trip stays received/unassigned).
     const ops = await apiLogin(request, testAccounts.opsManager);
     const detail = await ops.get(`/api/trips/${tripId}`);
     const { item } = (await detail.json()) as {
       item: { currentStatus: string; currentAssignment: unknown };
     };
-    expect(item.currentStatus).toBe("validated");
+    expect(item.currentStatus).toBe("received");
     expect(item.currentAssignment).toBeNull();
   });
 });
@@ -225,7 +225,7 @@ test.describe("006 authz — Finance (no assign_resources) is 403 on every write
 test.describe("006 authz — a view-only role still reads assignment data via view_all_trips", () => {
   test("Finance → GET board / detail / dashboard summary all 200", async ({ request }) => {
     const ctx = await apiLogin(request, testAccounts.nonAdmin);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
 
     const board = await ctx.get("/api/trips");
     expect(board.status()).toBe(200);

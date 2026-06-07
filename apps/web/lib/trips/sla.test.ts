@@ -193,7 +193,7 @@ describe.skipIf(!hasDb)("recomputeTripSla (integration)", () => {
   it("a customer_sla_rules row overrides DEFAULT_SLA_POLICY (a larger confirmation cutoff fires missing_assignment earlier)", async () => {
     // Pickup ~90 min out; default cutoff 120 ⇒ deadline already passed ⇒ missing_assignment under defaults.
     const soon = new Date(Date.now() + 90 * 60_000);
-    const tripId = await createTrip("validated", { pickupStart: soon, pickupEnd: new Date(soon.getTime() + 3_600_000) });
+    const tripId = await createTrip("received", { pickupStart: soon, pickupEnd: new Date(soon.getTime() + 3_600_000) });
 
     // Under defaults (no rule): no assignment + past the 120-min lead point ⇒ missing_assignment.
     await recomputeTripSla(db, tripId);

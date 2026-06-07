@@ -18,7 +18,7 @@ describe("assignTripSchema", () => {
     const res = assignTripSchema.safeParse({
       driverId: UUID,
       vehicleId: UUID,
-      expectedFromStatus: "validated",
+      expectedFromStatus: "received",
     });
     expect(res.success).toBe(true);
     if (res.success) {
@@ -29,10 +29,10 @@ describe("assignTripSchema", () => {
 
   it("requires driverId and vehicleId", () => {
     expect(
-      assignTripSchema.safeParse({ vehicleId: UUID, expectedFromStatus: "validated" }).success,
+      assignTripSchema.safeParse({ vehicleId: UUID, expectedFromStatus: "received" }).success,
     ).toBe(false);
     expect(
-      assignTripSchema.safeParse({ driverId: UUID, expectedFromStatus: "validated" }).success,
+      assignTripSchema.safeParse({ driverId: UUID, expectedFromStatus: "received" }).success,
     ).toBe(false);
   });
 
@@ -41,7 +41,7 @@ describe("assignTripSchema", () => {
       assignTripSchema.safeParse({
         driverId: "nope",
         vehicleId: UUID,
-        expectedFromStatus: "validated",
+        expectedFromStatus: "received",
       }).success,
     ).toBe(false);
   });
@@ -52,7 +52,7 @@ describe("assignTripSchema", () => {
       vehicleId: UUID,
       trailerId: "",
       carrierId: null,
-      expectedFromStatus: "validated",
+      expectedFromStatus: "received",
     });
     expect(res.success).toBe(true);
     if (res.success) {
@@ -85,7 +85,7 @@ describe("assignTripSchema", () => {
       assignTripSchema.safeParse({
         driverId: UUID,
         vehicleId: UUID,
-        expectedFromStatus: "validated",
+        expectedFromStatus: "received",
         notes: long,
       }).success,
     ).toBe(false);
@@ -93,7 +93,7 @@ describe("assignTripSchema", () => {
       assignTripSchema.safeParse({
         driverId: UUID,
         vehicleId: UUID,
-        expectedFromStatus: "validated",
+        expectedFromStatus: "received",
         overrideReason: long,
       }).success,
     ).toBe(false);
@@ -104,7 +104,7 @@ describe("assignTripSchema", () => {
       assignTripSchema.safeParse({
         driverId: UUID,
         vehicleId: UUID,
-        expectedFromStatus: "validated",
+        expectedFromStatus: "received",
         overrideReason: "   ",
       }).success,
     ).toBe(false);

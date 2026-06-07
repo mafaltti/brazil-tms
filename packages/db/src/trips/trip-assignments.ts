@@ -32,8 +32,9 @@ import { loadTripDetail, type TripDetail } from "./trip-dto";
 /**
  * Feature 006 — Dispatch assignment service layer (data-model.md §4; research §5/§6/§8/§9; contract
  * contracts/bff-endpoints.md §1–§4). The dispatch WRITE surface over the 003 trip domain: it drives
- * the EXISTING status machine (`validated→assigned` / `assigned→confirmed` / `assigned→validated`),
- * never redefines it, and binds a driver/vehicle/trailer/carrier to a trip through `trip_assignments`.
+ * the EXISTING status machine (`received→assigned` / `assigned→confirmed` / `assigned→received`; slice
+ * 015 retargeted assign/unassign off the removed `validated` state onto `received`), never redefines it,
+ * and binds a driver/vehicle/trailer/carrier to a trip through `trip_assignments`.
  *
  * Every mutation mirrors `transitionTripStatus` / `cancelTrip` EXACTLY: pre-tx legality/eligibility
  * (so a refused action changes NO state, SC-003) → one `db.transaction` doing the status-guarded
@@ -323,19 +324,20 @@ export async function checkAssignment(
 }
 
 // ---------------------------------------------------------------------------
-// assignTrip — validated → assigned (T027 · contract §1, assign path)
+// assignTrip — received → assigned (T027 · contract §1, assign path)
 // ---------------------------------------------------------------------------
 
 /**
- * Assign driver + vehicle (+ optional trailer/carrier) to a `validated` trip, transitioning it to
- * `assigned` (data-model.md §4; research §5/§9; contract §1). Mirrors `transitionTripStatus`:
+ * Assign driver + vehicle (+ optional trailer/carrier) to a `received` trip, transitioning it to
+ * `assigned` (data-model.md §4; research §5/§9; contract §1; slice 015 retargeted the source from the
+ * removed `validated` state to `received`). Mirrors `transitionTripStatus`:
  *
  *   1. enforce the minimum-required set (`requiredResourcesFor` by derived ownership) →
  *      `INCOMPLETE_ASSIGNMENT`;
  *   2. gather context + run the evaluator: any `block` ⇒ `ASSIGNMENT_BLOCKED` (findings attached, not
  *      overridable); any `warn` without `input.overrideReason` ⇒ `OVERRIDE_REQUIRED` (findings
  *      attached); a `warn` WITH a reason proceeds (the reason is persisted + audited);
- *   3. one transaction: guarded `UPDATE trips ... WHERE current_status='validated'` (0 rows ⇒
+ *   3. one transaction: guarded `UPDATE trips ... WHERE current_status='received'` (0 rows ⇒
  *      `STALE_TRANSITION`), INSERT the `is_current` assignment row, INSERT a `status_change`
  *      `trip_events` row, `writeAudit("trip.assign", ... reason)`.
  *
@@ -384,11 +386,11 @@ export async function assignTrip(
 
   return db.transaction(async (tx) => {
     const now = new Date();
-    // Optimistic-concurrency guard: only assign a trip still in `validated`.
+    // Optimistic-concurrency guard: only assign a trip still in `received` (slice 015; was `validated`).
     const updated = await tx
       .update(trips)
       .set({ currentStatus: "assigned", updatedAt: now })
-      .where(and(eq(trips.id, tripId), eq(trips.currentStatus, "validated")))
+      .where(and(eq(trips.id, tripId), eq(trips.currentStatus, "received")))
       .returning();
     if (updated.length === 0) {
       throw new Conflict("STALE_TRANSITION", "A viagem já mudou de status.");
@@ -409,7 +411,7 @@ export async function assignTrip(
     await tx.insert(tripEvents).values({
       tripId,
       eventType: "status_change",
-      statusBefore: "validated",
+      statusBefore: "received",
       statusAfter: "assigned",
       source: "operator_manual",
       actorUserId,
@@ -420,7 +422,7 @@ export async function assignTrip(
       entityType: "trip",
       entityId: tripId,
       action: "trip.assign",
-      previousValue: { currentStatus: "validated" },
+      previousValue: { currentStatus: "received" },
       newValue: {
         currentStatus: "assigned",
         driverId: input.driverId,
@@ -464,7 +466,7 @@ export async function reassignTrip(
   actorUserId: string,
 ): Promise<{ trip: TripDetail; findings: Finding[] }> {
   // Reassign is legal ONLY while the trip is `assigned` or `confirmed` (data-model §6 / contract §1).
-  // Reject any other expected status up front: the route sends EVERY non-`validated` expectedFromStatus
+  // Reject any other expected status up front: the route sends EVERY non-`received` expectedFromStatus
   // here, and the in-tx status guard below only verifies the trip is STILL in `expectedFromStatus` —
   // so without this an in-flight/terminal status (e.g. in_transit) whose expectedFromStatus matched
   // would slip through. This is the authoritative gate that keeps reassignment off executing trips.
@@ -595,13 +597,14 @@ export async function reassignTrip(
 }
 
 // ---------------------------------------------------------------------------
-// unassignTrip — assigned → validated (T049 · contract §2)
+// unassignTrip — assigned → received (T049 · contract §2)
 // ---------------------------------------------------------------------------
 
 /**
- * Un-assign an `assigned` trip, transitioning it back to `validated` (data-model.md §4/§6; contract
- * §2). The current assignment row is SUPERSEDED (retained as history, never deleted). Mirrors
- * `transitionTripStatus`: legality is checked with `canTransition("assigned","validated")` BEFORE the
+ * Un-assign an `assigned` trip, transitioning it back to `received` (data-model.md §4/§6; contract §2;
+ * slice 015 retargeted the unassign target from the removed `validated` state to `received`). The
+ * current assignment row is SUPERSEDED (retained as history, never deleted). Mirrors
+ * `transitionTripStatus`: legality is checked with `canTransition("assigned","received")` BEFORE the
  * transaction; inside one transaction the guarded `UPDATE trips ... WHERE current_status='assigned'`
  * (0 rows ⇒ `STALE_TRANSITION`) runs with a `status_change` `trip_events` row and a `trip.unassign`
  * audit. No eligibility evaluation (unassigning is always allowed from `assigned`).
@@ -619,8 +622,9 @@ export async function unassignTrip(
   const current = currentRows[0];
   if (!current) throw new Conflict("NOT_FOUND", "Viagem não encontrada.");
 
-  // Legality against the EXISTING status machine (no new edge — `assigned→validated` already exists).
-  if (!canTransition("assigned", "validated")) {
+  // Legality against the status machine — `assigned→received` is the unassign edge (slice 015; was
+  // `assigned→validated`).
+  if (!canTransition("assigned", "received")) {
     throw new Conflict("ILLEGAL_TRANSITION", "Transição de status não permitida.");
   }
 
@@ -628,7 +632,7 @@ export async function unassignTrip(
     const now = new Date();
     const updated = await tx
       .update(trips)
-      .set({ currentStatus: "validated", updatedAt: now })
+      .set({ currentStatus: "received", updatedAt: now })
       .where(and(eq(trips.id, tripId), eq(trips.currentStatus, "assigned")))
       .returning();
     if (updated.length === 0) {
@@ -645,7 +649,7 @@ export async function unassignTrip(
       tripId,
       eventType: "status_change",
       statusBefore: "assigned",
-      statusAfter: "validated",
+      statusAfter: "received",
       source: "operator_manual",
       actorUserId,
       notes: input.notes ?? null,
@@ -656,7 +660,7 @@ export async function unassignTrip(
       entityId: tripId,
       action: "trip.unassign",
       previousValue: { currentStatus: "assigned" },
-      newValue: { currentStatus: "validated" },
+      newValue: { currentStatus: "received" },
       actorUserId,
     });
 

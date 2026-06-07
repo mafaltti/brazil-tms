@@ -95,14 +95,14 @@ test.describe("007 authz — update_trip_status (milestones + notes)", () => {
 
     // Unauthenticated → 401.
     const noAuth = await request.post(`/api/trips/${tripId}/status`, {
-      data: { expectedFromStatus: "received", toStatus: "validated" },
+      data: { expectedFromStatus: "received", toStatus: "assigned" },
     });
     expect(noAuth.status()).toBe(401);
 
     // Holder (Dispatcher) → 200 on status + note.
     await apiLogin(request, testAccounts.dispatcher);
     const status = await request.post(`/api/trips/${tripId}/status`, {
-      data: { expectedFromStatus: "received", toStatus: "validated" },
+      data: { expectedFromStatus: "received", toStatus: "assigned" },
     });
     expect(status.status()).toBe(200);
     const note = await request.post(`/api/trips/${tripId}/events`, { data: { notes: "ok" } });
@@ -111,7 +111,7 @@ test.describe("007 authz — update_trip_status (milestones + notes)", () => {
     // Non-holder (Finance) → 403 on status + note.
     await apiLogin(request, testAccounts.nonAdmin);
     const status403 = await request.post(`/api/trips/${tripId}/status`, {
-      data: { expectedFromStatus: "validated", toStatus: "assigned" },
+      data: { expectedFromStatus: "assigned", toStatus: "confirmed" },
     });
     expect(status403.status()).toBe(403);
     const note403 = await request.post(`/api/trips/${tripId}/events`, { data: { notes: "x" } });

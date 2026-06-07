@@ -26,9 +26,13 @@ import { testAccounts, routes } from "./test-config";
  * assignment row indicator + the per-row quick-assign action; `/` (Home) renders the "Viagens sem
  * atribuição" widget with a deep-link into the Unassigned view.
  *
- * Self-seeds via `@brazil-tms/db`: one customer + locations + an UNASSIGNED `validated` trip pinned to
+ * Self-seeds via `@brazil-tms/db`: one customer + locations + an UNASSIGNED `received` trip pinned to
  * today's São Paulo pickup window (so it shows on the board and counts on the dashboard) + clean
  * resources for the assign form. FK-safe cleanup; unique ids.
+ *
+ * Slice 015 INVERTED slice 014's queue: the dispatch queue now filters `status=received` (was
+ * `status=validated`), so a `received` trip is INCLUDED (it is the first dispatchable status) and the
+ * assign hop is `received → assigned`.
  */
 
 const ADMIN_EMAIL = "admin@braziltransports.com.br";
@@ -63,9 +67,10 @@ let driverName = "";
 let vehiclePlate = "";
 let unassignedExternalId = "";
 let unassignedTripId = "";
-// Slice 014 (US3): a `received` trip the validated-only queue must EXCLUDE, and a dedicated `validated`
-// trip used to drive a COMPLETE assignment through the form (kept separate from `unassignedTripId`,
-// which later Control-Tower tests rely on staying unassigned).
+// Slice 015 (INVERTED): a second `received` trip the queue must now INCLUDE (was the excluded trip
+// under slice 014's validated-only queue), and a dedicated `received` trip used to drive a COMPLETE
+// assignment through the form (kept separate from `unassignedTripId`, which later Control-Tower tests
+// rely on staying unassigned).
 let receivedExternalId = "";
 let receivedTripId = "";
 let assignableExternalId = "";
@@ -109,7 +114,7 @@ test.beforeAll(async () => {
       externalTripId: unassignedExternalId,
       originLocationId: originId,
       destinationLocationId: destId,
-      currentStatus: "validated",
+      currentStatus: "received",
       originalPlan: { customerId, originLocationId: originId, destinationLocationId: destId },
       plannedVehicleType: "truck",
       plannedPickupWindowStart: todayMidday,
@@ -119,8 +124,8 @@ test.beforeAll(async () => {
   unassignedTripId = trip[0]!.id;
   tripIds.push(unassignedTripId);
 
-  // A `received` trip, also unassigned + today: it WOULD appear under scope=active but must be excluded
-  // by the validated-only queue (slice 014 US3 / FR-006).
+  // A second `received` trip, also unassigned + today: slice 015 INVERTED the slice-014 exclusion — the
+  // `status=received` queue now INCLUDES it (it is the first dispatchable status; FR-006).
   receivedExternalId = code("EXT-RECEBIDA");
   const receivedTrip = await db
     .insert(trips)
@@ -139,7 +144,7 @@ test.beforeAll(async () => {
   receivedTripId = receivedTrip[0]!.id;
   tripIds.push(receivedTripId);
 
-  // A second `validated`, unassigned trip used solely to complete an assignment via the form.
+  // A second `received`, unassigned trip used solely to complete an assignment via the form.
   assignableExternalId = code("EXT-ATRIBUIR");
   const assignableTrip = await db
     .insert(trips)
@@ -148,7 +153,7 @@ test.beforeAll(async () => {
       externalTripId: assignableExternalId,
       originLocationId: originId,
       destinationLocationId: destId,
-      currentStatus: "validated",
+      currentStatus: "received",
       originalPlan: { customerId, originLocationId: originId, destinationLocationId: destId },
       plannedVehicleType: "truck",
       plannedPickupWindowStart: todayMidday,
@@ -212,9 +217,10 @@ test.describe("US5 — Dispatch Board", () => {
     await expect(tripLink).toBeVisible({ timeout: 15_000 });
     await expect(tripLink).toHaveAttribute("href", `/trips/${unassignedTripId}`);
 
-    // Slice 014 (US3 / FR-006): the validated-only queue EXCLUDES a `received` trip — it offers no
-    // "Atribuir" that would fail with ILLEGAL_TRANSITION.
-    await expect(page.getByRole("link", { name: receivedExternalId })).toHaveCount(0);
+    // Slice 015 (INVERTED, FR-006): the `status=received` queue INCLUDES a `received` trip — it is the
+    // first dispatchable status, so its "Atribuir" succeeds (`received → assigned`). (Under slice 014's
+    // validated-only queue this trip was EXCLUDED; the collapse flips that.)
+    await expect(page.getByRole("link", { name: receivedExternalId })).toBeVisible({ timeout: 15_000 });
 
     // The per-row assign action ("Atribuir") opens the shared assignment form dialog.
     const row = page.getByRole("listitem").filter({ hasText: unassignedExternalId });
@@ -225,14 +231,14 @@ test.describe("US5 — Dispatch Board", () => {
     await expect(dialog.getByText("Motorista", { exact: true })).toBeVisible();
   });
 
-  test("a complete assignment from the validated-only queue succeeds (validated → assigned) (slice 014 US3)", async ({
+  test("a complete assignment from the received queue succeeds (received → assigned) (slice 015)", async ({
     page,
   }) => {
     await login(page, testAccounts.opsManager);
     await page.goto("/dispatch");
     await expect(page.getByText("Fila de atribuição")).toBeVisible({ timeout: 15_000 });
 
-    // Open the assign dialog for the dedicated validated trip.
+    // Open the assign dialog for the dedicated received trip.
     const row = page.getByRole("listitem").filter({ hasText: assignableExternalId });
     await expect(row).toBeVisible({ timeout: 15_000 });
     await row.getByRole("button", { name: "Atribuir" }).click();
@@ -248,7 +254,7 @@ test.describe("US5 — Dispatch Board", () => {
 
     // Clean (owned, matching, active, non-expired) resources ⇒ no block/warn findings ⇒ the assign
     // action enables; submit it. onDone closes the dialog ONLY on a successful assign (a failure keeps
-    // it open with an error), so a hidden dialog is the success signal (validated → assigned).
+    // it open with an error), so a hidden dialog is the success signal (received → assigned).
     await dialog.getByRole("button", { name: "Atribuir" }).click();
     await expect(dialog).toBeHidden({ timeout: 15_000 });
   });

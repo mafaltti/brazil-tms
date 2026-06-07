@@ -116,7 +116,7 @@ describe.skipIf(!hasDb)("assignment-check (integration)", () => {
     destinationLocationId = dest[0]!.id;
     createdLocationIds.push(destinationLocationId);
 
-    targetTripId = await insertTrip("validated", TARGET_START, TARGET_END);
+    targetTripId = await insertTrip("received", TARGET_START, TARGET_END);
   });
 
   afterAll(async () => {

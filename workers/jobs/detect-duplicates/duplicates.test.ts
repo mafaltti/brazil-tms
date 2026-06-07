@@ -364,9 +364,9 @@ describe.skipIf(!hasDb)("detect-duplicates job — full pipeline (integration)",
         .limit(1)
     )[0]!;
 
-    // Move the trip PAST `confirmed` via the legal 003 path. Imported trips are born `validated`
-    // (slice 014), so the walk starts there: validated → assigned → confirmed → at_origin.
-    await transitionTripStatus(trip.id, { expectedFromStatus: "validated", toStatus: "assigned" }, actorId);
+    // Move the trip PAST `confirmed` via the legal 003 path. Imported trips are born `received`
+    // (slice 015), so the walk starts there: received → assigned → confirmed → at_origin.
+    await transitionTripStatus(trip.id, { expectedFromStatus: "received", toStatus: "assigned" }, actorId);
     await transitionTripStatus(trip.id, { expectedFromStatus: "assigned", toStatus: "confirmed" }, actorId);
     await transitionTripStatus(trip.id, { expectedFromStatus: "confirmed", toStatus: "at_origin" }, actorId);
 

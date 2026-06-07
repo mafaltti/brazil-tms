@@ -82,12 +82,12 @@ describe.skipIf(!hasDb)("trip-reassign (integration)", () => {
     return id;
   }
 
-  /** Assign the trip with the A pair (validated→assigned), returning the trip id. */
+  /** Assign the trip with the A pair (received→assigned), returning the trip id. */
   async function seedAssignedTrip(): Promise<string> {
-    const tripId = await insertTrip("validated");
+    const tripId = await insertTrip("received");
     await assignTrip(
       tripId,
-      { driverId: driverAId, vehicleId: vehicleAId, expectedFromStatus: "validated" },
+      { driverId: driverAId, vehicleId: vehicleAId, expectedFromStatus: "received" },
       actorId,
     );
     return tripId;

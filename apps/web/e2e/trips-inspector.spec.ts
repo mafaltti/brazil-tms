@@ -89,18 +89,22 @@ test.beforeAll(async () => {
       externalTripId: code("EXT"),
       originLocationId: originId,
       destinationLocationId: destId,
-      currentStatus: "validated",
+      currentStatus: "received",
       originalPlan,
       plannedVehicleType: "truck",
     })
     .returning();
   tripId = trip[0]!.id;
 
+  // A realistic status-change history row for the inspector to render: the trip was assigned and then
+  // returned to `received` (the slice-015 unassign edge `assigned → received`), so the current status is
+  // `received` again. The inspector test only asserts a status_change event + a trip.status_change audit
+  // exist and that currentStatus is `received` — but a legal before/after pair keeps the fixture honest.
   await db.insert(tripEvents).values({
     tripId,
     eventType: "status_change",
-    statusBefore: "received",
-    statusAfter: "validated",
+    statusBefore: "assigned",
+    statusAfter: "received",
     source: "system",
     actorUserId: actorId,
     eventTimestamp: new Date(),
@@ -110,8 +114,8 @@ test.beforeAll(async () => {
     entityType: "trip",
     entityId: tripId,
     action: "trip.status_change",
-    previousValue: { currentStatus: "received" },
-    newValue: { currentStatus: "validated" },
+    previousValue: { currentStatus: "assigned" },
+    newValue: { currentStatus: "received" },
     actorUserId: actorId,
   });
 });
@@ -161,8 +165,8 @@ test.describe("US1 — trip inspector authorization + payload", () => {
       };
     };
     expect(item.id).toBe(tripId);
-    expect(item.currentStatus).toBe("validated");
-    // `validated` is not a billing-phase status → the derived projection is null.
+    expect(item.currentStatus).toBe("received");
+    // `received` is not a billing-phase status → the derived projection is null.
     expect(item.billingStatus).toBeNull();
     expect(item.originalPlan).toBeTruthy();
     expect(item.events.some((e) => e.eventType === "status_change")).toBe(true);

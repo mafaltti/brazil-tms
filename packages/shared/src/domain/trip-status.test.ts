@@ -23,8 +23,8 @@ import {
  */
 
 describe("TRIP_STATUSES", () => {
-  it("has exactly the 18 spec statuses", () => {
-    expect(TRIP_STATUSES).toHaveLength(18);
+  it("has exactly the 16 spec statuses (slice 015 collapsed the two validation states)", () => {
+    expect(TRIP_STATUSES).toHaveLength(16);
   });
 
   it("does NOT contain 'warning' — a validation warning is an attention flag, not a status (FR-012)", () => {
@@ -43,7 +43,7 @@ describe("canTransition — every declared legal transition is accepted", () => 
 });
 
 describe("canTransition — illegal transitions are rejected", () => {
-  it("received → in_transit is illegal (must pass through validation/assignment)", () => {
+  it("received → in_transit is illegal (must pass through assignment)", () => {
     expect(canTransition("received", "in_transit")).toBe(false);
   });
 
@@ -51,8 +51,8 @@ describe("canTransition — illegal transitions are rejected", () => {
     expect(canTransition("received", "completed")).toBe(false);
   });
 
-  it("validated → confirmed is illegal (must be assigned first)", () => {
-    expect(canTransition("validated", "confirmed")).toBe(false);
+  it("received → confirmed is illegal (must be assigned first)", () => {
+    expect(canTransition("received", "confirmed")).toBe(false);
   });
 
   it("billing_pending → billed is illegal (must pass through billing_ready)", () => {
@@ -120,16 +120,16 @@ describe("disputed round-trip (FR-011)", () => {
 });
 
 describe("006 assignment transitions (canTransition reuses the single table)", () => {
-  it("validated → assigned is legal (assign)", () => {
-    expect(canTransition("validated", "assigned")).toBe(true);
+  it("received → assigned is legal (assign)", () => {
+    expect(canTransition("received", "assigned")).toBe(true);
   });
 
   it("assigned → confirmed is legal (confirm)", () => {
     expect(canTransition("assigned", "confirmed")).toBe(true);
   });
 
-  it("assigned → validated is legal (unassign)", () => {
-    expect(canTransition("assigned", "validated")).toBe(true);
+  it("assigned → received is legal (unassign — slice 015; was validated)", () => {
+    expect(canTransition("assigned", "received")).toBe(true);
   });
 });
 
@@ -200,8 +200,8 @@ describe("billingStatus projection (US5, FR-013, SC-005)", () => {
 // ---------------------------------------------------------------------------
 
 describe("ACTIVE_TRIP_STATUSES / isActiveStatus (005 R4)", () => {
-  it("has exactly the 12 non-terminal statuses", () => {
-    expect(ACTIVE_TRIP_STATUSES).toHaveLength(12);
+  it("has exactly the 10 non-terminal statuses (slice 015 removed the two validation states)", () => {
+    expect(ACTIVE_TRIP_STATUSES).toHaveLength(10);
   });
 
   it("excludes every closed/terminal status (completed, billing_*, billed, cancelled, disputed)", () => {
@@ -218,7 +218,7 @@ describe("ACTIVE_TRIP_STATUSES / isActiveStatus (005 R4)", () => {
     }
   });
 
-  it("isActiveStatus is true for each active status and false otherwise (partition of the 18)", () => {
+  it("isActiveStatus is true for each active status and false otherwise (partition of the 16)", () => {
     const active = new Set<TripStatus>(ACTIVE_TRIP_STATUSES);
     for (const s of TRIP_STATUSES) {
       expect(isActiveStatus(s)).toBe(active.has(s));
@@ -227,13 +227,13 @@ describe("ACTIVE_TRIP_STATUSES / isActiveStatus (005 R4)", () => {
 });
 
 describe("NON_EDITABLE_TRIP_STATUSES / isNonEditableStatus (005 R11)", () => {
-  it("is the exact complement of ACTIVE_TRIP_STATUSES (12 active + 6 non-editable = 18)", () => {
+  it("is the exact complement of ACTIVE_TRIP_STATUSES (10 active + 6 non-editable = 16)", () => {
     expect(NON_EDITABLE_TRIP_STATUSES).toHaveLength(6);
     const active = new Set<TripStatus>(ACTIVE_TRIP_STATUSES);
     const nonEditable = new Set<TripStatus>(NON_EDITABLE_TRIP_STATUSES);
     // disjoint
     for (const s of nonEditable) expect(active.has(s)).toBe(false);
-    // together they cover all 18
+    // together they cover all 16
     expect(active.size + nonEditable.size).toBe(TRIP_STATUSES.length);
     for (const s of TRIP_STATUSES) expect(active.has(s) || nonEditable.has(s)).toBe(true);
   });

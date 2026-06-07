@@ -49,7 +49,7 @@ let destId = "";
 
 // Distinct trips captured for FK-safe cleanup + per-test assertions.
 let inTransitId = "";
-let validatedId = "";
+let receivedId = "";
 let completedId = "";
 let billingPendingId = "";
 const tripIds: string[] = [];
@@ -121,7 +121,7 @@ test.beforeAll(async () => {
   const todayMidday = new Date(new Date(from).getTime() + 12 * 60 * 60 * 1000);
 
   inTransitId = await seedTrip(extInTransit, "in_transit", todayMidday);
-  validatedId = await seedTrip(extValidated, "validated", new Date("2026-06-02T08:00:00.000Z"));
+  receivedId = await seedTrip(extValidated, "received", new Date("2026-06-02T08:00:00.000Z"));
   completedId = await seedTrip(extCompleted, "completed", new Date("2026-06-03T08:00:00.000Z"));
   billingPendingId = await seedTrip(
     extBilling,
@@ -166,7 +166,7 @@ test.describe("US1 — Trip Control Tower board (authorization + filters)", () =
     };
     const ids = items.map((t) => t.id);
     expect(ids).toContain(inTransitId);
-    expect(ids).toContain(validatedId);
+    expect(ids).toContain(receivedId);
     expect(ids).not.toContain(completedId);
     expect(ids).not.toContain(billingPendingId);
     expect(typeof total).toBe("number");
@@ -182,17 +182,17 @@ test.describe("US1 — Trip Control Tower board (authorization + filters)", () =
     expect(items.every((t) => t.currentStatus === "in_transit")).toBe(true);
     const ids = items.map((t) => t.id);
     expect(ids).toContain(inTransitId);
-    expect(ids).not.toContain(validatedId);
+    expect(ids).not.toContain(receivedId);
   });
 
   test("AND combo (customerId + status) narrows correctly", async ({ request }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const res = await ctx.get(`/api/trips?customerId=${customerId}&status=validated`);
+    const res = await ctx.get(`/api/trips?customerId=${customerId}&status=received`);
     expect(res.status()).toBe(200);
     const { items } = (await res.json()) as {
       items: Array<{ id: string; customerId: string; currentStatus: string }>;
     };
-    expect(items.map((t) => t.id)).toEqual([validatedId]);
+    expect(items.map((t) => t.id)).toEqual([receivedId]);
     expect(items.every((t) => t.customerId === customerId)).toBe(true);
   });
 
@@ -243,7 +243,7 @@ test.describe("US5 — synchronous capped CSV export", () => {
 
     // Narrow to a single status → the export no longer carries the other trips' external ids.
     const oneRes = await ctx.get(
-      `/api/trips/export?customerId=${customerId}&status=validated&scope=all`,
+      `/api/trips/export?customerId=${customerId}&status=received&scope=all`,
     );
     expect(oneRes.status()).toBe(200);
     const oneBody = await oneRes.text();

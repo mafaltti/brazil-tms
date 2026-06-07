@@ -60,10 +60,13 @@ export const trailerType = pgEnum("trailer_type", [
 /**
  * Trip-domain enums (feature 003, data-model.md §Enums).
  *
- * `trip_status` is the single trip status machine — exactly 18 values, in lifecycle order (R2,
- * FR-008). Legal transitions are NOT encoded here (membership only); the authoritative transition
- * table lives in `@brazil-tms/shared` (`domain/trip-status.ts`) and is the single source slices
- * 004–009 import (FR-023). Adding a status later is a one-line `ALTER TYPE ... ADD VALUE`.
+ * `trip_status` keeps all 18 physical members, but slice 015 made `validation_error` and `validated`
+ * DORMANT: they are removed from the ACTIVE TS machine (`@brazil-tms/shared` `TRIP_STATUSES`, now 16
+ * values) and unreachable by any TS-typed writer, yet retained here because Postgres has no
+ * `ALTER TYPE ... DROP VALUE` and the immutable `trip_events` history still references them. Legal
+ * transitions are NOT encoded here (membership only); the authoritative transition table lives in
+ * `@brazil-tms/shared` (`domain/trip-status.ts`) and is the single source slices 004–009 import
+ * (FR-023). Adding a status later is a one-line `ALTER TYPE ... ADD VALUE`.
  *
  * `trip_event_type` / `trip_event_source` are foundation default sets that slice 007 extends via
  * migration (e.g. `gps`, `driver_input`) — labeled scaffolding (Constitution II). `status_change`
@@ -75,8 +78,8 @@ export const trailerType = pgEnum("trailer_type", [
  */
 export const tripStatus = pgEnum("trip_status", [
   "received",
-  "validation_error",
-  "validated",
+  "validation_error", // DORMANT (slice 015) — retained for trip_events history; not in the active TS machine
+  "validated", // DORMANT (slice 015) — retained for trip_events history; not in the active TS machine
   "assigned",
   "confirmed",
   "at_origin",

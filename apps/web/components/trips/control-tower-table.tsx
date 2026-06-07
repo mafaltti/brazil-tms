@@ -188,11 +188,12 @@ export function ControlTowerTable({
             id: "actions",
             header: () => tCommon("actions"),
             cell: ({ row }: { row: { original: TripBoardRow } }) =>
-              // Quick-assign is ASSIGN-only: shown for an UNASSIGNED `validated` trip. Reassigning an
-              // already-assigned trip needs the full current-assignment context (resources pre-filled),
-              // which only the Trip-Detail panel has — the board row carries just display names — so an
-              // assigned row is reached via its detail link, not a blank reassign form here.
-              !row.original.isAssigned && row.original.currentStatus === "validated" ? (
+              // Quick-assign is ASSIGN-only: shown for an UNASSIGNED `received` trip (slice 015; was
+              // `validated`). Reassigning an already-assigned trip needs the full current-assignment
+              // context (resources pre-filled), which only the Trip-Detail panel has — the board row
+              // carries just display names — so an assigned row is reached via its detail link, not a
+              // blank reassign form here.
+              !row.original.isAssigned && row.original.currentStatus === "received" ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -301,9 +302,9 @@ export function ControlTowerTable({
         </div>
       </div>
 
-      {/* Quick-assign dialog (006, T063) — the shared AssignmentForm for an UNASSIGNED `validated` row
-          (ASSIGN-only; reassignment/edit lives in the Trip-Detail panel, which has the full current
-          assignment for pre-filled pickers). currentAssignment is therefore always null here. */}
+      {/* Quick-assign dialog (006, T063) — the shared AssignmentForm for an UNASSIGNED `received` row
+          (slice 015; ASSIGN-only; reassignment/edit lives in the Trip-Detail panel, which has the full
+          current assignment for pre-filled pickers). currentAssignment is therefore always null here. */}
       <Dialog open={assignRow != null} onOpenChange={(open) => !open && setAssignRow(null)}>
         <DialogContent>
           <DialogHeader>

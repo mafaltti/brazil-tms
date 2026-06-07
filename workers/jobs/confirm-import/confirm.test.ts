@@ -26,9 +26,9 @@ import { runConfirm } from "./index";
 /**
  * T039 — confirm job integration test: drive the full US1 pipeline (parse → validate →
  * detect-duplicates → confirm) against the live dev DB + Storage, asserting trips are created
- * **born `validated`** (slice 014) and linked to the batch, the confirm is idempotent (a re-run creates
- * 0 new trips), and the batch counts are tallied. Slice 014 also asserts: a confirm-created trip assigns
- * immediately (`validated → assigned`, no ILLEGAL_TRANSITION), and an `update` to an already-`assigned`
+ * **born `received`** (slice 015) and linked to the batch, the confirm is idempotent (a re-run creates
+ * 0 new trips), and the batch counts are tallied. Slice 015 also asserts: a confirm-created trip assigns
+ * immediately (`received → assigned`, no ILLEGAL_TRANSITION), and an `update` to an already-`assigned`
  * trip keeps its status (FR-002, never downgraded). Static imports per project convention; skips without
  * DATABASE_URL.
  */
@@ -39,7 +39,7 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
   let customerId = "";
   let templateId = "";
   // Owned active driver + matching `truck` vehicle (far-future docs) so a confirm-created trip can be
-  // assigned in-test to prove `validated → assigned` works (slice 014, US1).
+  // assigned in-test to prove `received → assigned` works (slice 015, US1).
   let driverId = "";
   let vehicleId = "";
   const createdBatchIds: string[] = [];
@@ -172,7 +172,7 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
     return batchId;
   }
 
-  it("creates trips born validated linked to the batch; re-running confirm is idempotent", async () => {
+  it("creates trips born received linked to the batch; re-running confirm is idempotent", async () => {
     const extA = uniq("SH-A");
     const extB = uniq("SH-B");
     const csv = [
@@ -206,8 +206,8 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
 
     expect(created).toHaveLength(2);
     for (const t of created) {
-      // Born validated (slice 014, FR-001/FR-004) — never first persisted as `received`.
-      expect(t.currentStatus).toBe("validated");
+      // Born received (slice 015, FR-001/FR-004) — `received` is the first dispatchable status.
+      expect(t.currentStatus).toBe("received");
       expect(t.importBatchId).toBe(batchId);
       expect(t.customerId).toBe(customerId);
     }
@@ -321,7 +321,7 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
     expect(batch2.status).toBe("completed");
   });
 
-  it("a confirm-created trip assigns immediately (validated → assigned), no ILLEGAL_TRANSITION (slice 014 US1)", async () => {
+  it("a confirm-created trip assigns immediately (received → assigned), no ILLEGAL_TRANSITION (slice 015 US1)", async () => {
     const ext = uniq("SH-ASSIGN");
     const csv = [
       "trip_id,origin,destination,pickup_start,vehicle",
@@ -337,27 +337,27 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
     for (const t of created) createdTripIds.push(t.id);
     expect(created).toHaveLength(1);
     const trip = created[0]!;
-    expect(trip.currentStatus).toBe("validated"); // born validated — immediately assignable.
+    expect(trip.currentStatus).toBe("received"); // born received — immediately assignable.
 
-    // Assign right away: proves `validated → assigned` works with NO manual validate step (the bug this
-    // slice fixes was an ILLEGAL_TRANSITION because the trip was stuck at `received`). overrideReason
+    // Assign right away: proves `received → assigned` works with NO manual validate step. `received` is now
+    // the first dispatchable status (slice 015 collapsed the validation states into it). overrideReason
     // absorbs any eligibility WARN (e.g. a vehicle-type label difference) so the transition is the focus.
     const { trip: assigned } = await assignTrip(
       trip.id,
       {
         driverId,
         vehicleId,
-        expectedFromStatus: "validated",
-        overrideReason: "Slice 014 — teste de atribuição imediata",
+        expectedFromStatus: "received",
+        overrideReason: "Slice 015 — teste de atribuição imediata",
       },
       actorId,
     );
     expect(assigned.currentStatus).toBe("assigned");
   });
 
-  it("an import update to an already-assigned trip keeps its status and updates its plan (slice 014 US2, FR-002)", async () => {
+  it("an import update to an already-assigned trip keeps its status and updates its plan (slice 015 US2, FR-002)", async () => {
     const ext = uniq("SH-UPD");
-    // Batch 1 — create (born validated) + assign → the trip is now `assigned` (in-flight).
+    // Batch 1 — create (born received) + assign → the trip is now `assigned` (in-flight).
     const csv1 = [
       "trip_id,origin,destination,pickup_start,vehicle",
       `${ext},ORIG,DEST,2026-08-10 08:00,Truck`,
@@ -376,7 +376,7 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
 
     const { trip: assigned } = await assignTrip(
       tripId,
-      { driverId, vehicleId, expectedFromStatus: "validated", overrideReason: "Slice 014 — US2 setup" },
+      { driverId, vehicleId, expectedFromStatus: "received", overrideReason: "Slice 015 — US2 setup" },
       actorId,
     );
     expect(assigned.currentStatus).toBe("assigned");
@@ -397,15 +397,15 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
 
     await runConfirm({ batchId: batch2, actorUserId: actorId });
 
-    // The plan changed but the status stayed `assigned` — NEVER reverted to `validated` (FR-002).
+    // The plan changed but the status stayed `assigned` — NEVER reverted to `received` (FR-002).
     const after = (await db.select().from(trips).where(eq(trips.id, tripId)).limit(1))[0]!;
     expect(after.currentStatus).toBe("assigned");
     expect(after.plannedPickupWindowStart?.getTime()).not.toBe(beforePickup?.getTime());
   });
 
-  it("a new row re-resolved via the unique-key race leaves an existing assigned trip's status unchanged (slice 014 US2, I2)", async () => {
+  it("a new row re-resolved via the unique-key race leaves an existing assigned trip's status unchanged (slice 015 US2, I2)", async () => {
     const ext = uniq("SH-RACE");
-    // Setup: create (born validated) + assign a trip via the normal import path.
+    // Setup: create (born received) + assign a trip via the normal import path.
     const csv = [
       "trip_id,origin,destination,pickup_start,vehicle",
       `${ext},ORIG,DEST,2026-09-20 08:00,Truck`,
@@ -419,7 +419,7 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
     createdTripIds.push(trip.id);
     await assignTrip(
       trip.id,
-      { driverId, vehicleId, expectedFromStatus: "validated", overrideReason: "Slice 014 — race setup" },
+      { driverId, vehicleId, expectedFromStatus: "received", overrideReason: "Slice 015 — race setup" },
       actorId,
     );
 
@@ -462,7 +462,7 @@ describe.skipIf(!hasDb)("confirm job — full pipeline (integration)", () => {
     expect(sameExt).toHaveLength(1);
     const after = sameExt[0]!;
     expect(after.id).toBe(trip.id);
-    expect(after.currentStatus).toBe("assigned"); // never reverted to validated.
+    expect(after.currentStatus).toBe("assigned"); // never reverted to received.
     expect(after.plannedRouteNotes).toBe("RACE-UPDATED");
   });
 });

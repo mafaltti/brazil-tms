@@ -23,7 +23,7 @@ import type { TripStatus } from "@brazil-tms/shared";
  *   $env:DATABASE_URL='postgres://postgres:postgres@localhost:5433/postgres'
  *   pnpm exec vitest run --project web apps/web/lib/trips/trip-unassign.test.ts
  *
- * Un-assigning an `assigned` trip transitions it back to `validated` (data-model §4/§6): the current
+ * Un-assigning an `assigned` trip transitions it back to `received` (data-model §4/§6): the current
  * assignment row is SUPERSEDED (is_current=false + superseded_at) and RETAINED as history (never
  * hard-deleted); exactly ONE `status_change` `trip_events` row + ONE `trip.unassign` audit are written.
  * Guards: a stale `current_status`, an illegal-source trip, and a missing trip resolve to
@@ -72,8 +72,8 @@ describe.skipIf(!hasDb)("trip-unassign (integration)", () => {
 
   /** Drive a fresh trip to `assigned` via the real service, returning the trip id. */
   async function seedAssignedTrip(): Promise<string> {
-    const tripId = await insertTrip("validated");
-    await assignTrip(tripId, { driverId, vehicleId, expectedFromStatus: "validated" }, actorId);
+    const tripId = await insertTrip("received");
+    await assignTrip(tripId, { driverId, vehicleId, expectedFromStatus: "received" }, actorId);
     return tripId;
   }
 
@@ -143,7 +143,7 @@ describe.skipIf(!hasDb)("trip-unassign (integration)", () => {
     for (const id of createdCustomerIds) await db.delete(customers).where(eq(customers.id, id));
   });
 
-  it("un-assigns an assigned trip → validated, supersedes + retains the current row, one event + one trip.unassign audit", async () => {
+  it("un-assigns an assigned trip → received, supersedes + retains the current row, one event + one trip.unassign audit", async () => {
     const tripId = await seedAssignedTrip();
     const before = await db
       .select()
@@ -152,7 +152,7 @@ describe.skipIf(!hasDb)("trip-unassign (integration)", () => {
     const assignmentId = before[0]!.id;
 
     const { trip } = await unassignTrip(tripId, { expectedFromStatus: "assigned" }, actorId);
-    expect(trip.currentStatus).toBe("validated");
+    expect(trip.currentStatus).toBe("received");
 
     // No current assignment remains; the row is RETAINED (still present), not current, superseded.
     const current = await db
@@ -172,14 +172,14 @@ describe.skipIf(!hasDb)("trip-unassign (integration)", () => {
     expect(trip.currentAssignment).toBeNull();
     expect(trip.assignmentHistory.map((h) => h.id)).toContain(assignmentId);
 
-    // Exactly one assigned→validated status_change event from the unassign.
+    // Exactly one assigned→received status_change event from the unassign.
     const events = await db
       .select()
       .from(tripEvents)
       .where(and(eq(tripEvents.tripId, tripId), eq(tripEvents.eventType, "status_change")));
-    const toValidated = events.filter((e) => e.statusAfter === "validated");
-    expect(toValidated).toHaveLength(1);
-    expect(toValidated[0]!.statusBefore).toBe("assigned");
+    const toReceived = events.filter((e) => e.statusAfter === "received");
+    expect(toReceived).toHaveLength(1);
+    expect(toReceived[0]!.statusBefore).toBe("assigned");
 
     const audits = await db
       .select()
@@ -190,7 +190,7 @@ describe.skipIf(!hasDb)("trip-unassign (integration)", () => {
 
   it("rejects un-assigning when the trip is no longer assigned with STALE_TRANSITION", async () => {
     const tripId = await seedAssignedTrip();
-    // First unassign succeeds (assigned → validated); a second with the stale expectation now fails the
+    // First unassign succeeds (assigned → received); a second with the stale expectation now fails the
     // guarded UPDATE ... WHERE current_status='assigned' (0 rows).
     await unassignTrip(tripId, { expectedFromStatus: "assigned" }, actorId);
     await expect(

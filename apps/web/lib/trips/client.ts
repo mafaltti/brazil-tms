@@ -300,8 +300,9 @@ interface AssignmentResult {
 }
 
 /**
- * Assign resources to a `validated` trip (POST). Error codes: INCOMPLETE_ASSIGNMENT,
- * OVERRIDE_REQUIRED, ASSIGNMENT_BLOCKED, STALE_TRANSITION, ILLEGAL_TRANSITION, NOT_FOUND, VALIDATION.
+ * Assign resources to a `received` trip (POST; slice 015, was `validated`). Error codes:
+ * INCOMPLETE_ASSIGNMENT, OVERRIDE_REQUIRED, ASSIGNMENT_BLOCKED, STALE_TRANSITION, ILLEGAL_TRANSITION,
+ * NOT_FOUND, VALIDATION.
  */
 export function useAssignTrip(id: string) {
   const queryClient = useQueryClient();
@@ -341,7 +342,7 @@ export function useReassignTrip(id: string) {
   });
 }
 
-/** Unassign (DELETE) — supersedes the current assignment and reverts `assigned → validated`. */
+/** Unassign (DELETE) — supersedes the current assignment and reverts `assigned → received` (slice 015). */
 export function useUnassignTrip(id: string) {
   const queryClient = useQueryClient();
   return useMutation({

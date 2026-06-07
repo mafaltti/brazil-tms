@@ -37,7 +37,7 @@ describe.skipIf(!hasDb)("customer SLA rules (integration)", () => {
     return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   }
 
-  /** A `validated` trip whose pickup is ~60 min out (so the confirmation cutoff is the lever). */
+  /** A `received` trip whose pickup is ~60 min out (so the confirmation cutoff is the lever). */
   async function tripPickupInMinutes(minutes: number, vehicleType?: string): Promise<string> {
     const start = new Date(Date.now() + minutes * 60_000);
     const inserted = await db
@@ -48,7 +48,7 @@ describe.skipIf(!hasDb)("customer SLA rules (integration)", () => {
         originLocationId: originId,
         destinationLocationId: destId,
         originalPlan: {},
-        currentStatus: "validated",
+        currentStatus: "received",
         plannedVehicleType: (vehicleType ?? null) as never,
         plannedPickupWindowStart: start,
         plannedPickupWindowEnd: new Date(start.getTime() + 3_600_000),
@@ -143,7 +143,7 @@ describe.skipIf(!hasDb)("customer SLA rules (integration)", () => {
         originLocationId: o2!.id,
         destinationLocationId: d2!.id,
         originalPlan: {},
-        currentStatus: "validated",
+        currentStatus: "received",
         plannedPickupWindowStart: start,
         plannedPickupWindowEnd: new Date(start.getTime() + 3_600_000),
       })

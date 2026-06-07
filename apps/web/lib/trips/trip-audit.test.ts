@@ -111,7 +111,7 @@ describe.skipIf(!hasDb)("trip audit semantics (integration, US3)", () => {
 
   it("a status change writes exactly one trip.status_change audit row", async () => {
     const id = await newTrip();
-    await transitionTripStatus(id, { toStatus: "validated", expectedFromStatus: "received" }, actorId);
+    await transitionTripStatus(id, { toStatus: "assigned", expectedFromStatus: "received" }, actorId);
 
     const audits = await db
       .select()

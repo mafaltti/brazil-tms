@@ -12,11 +12,12 @@ import { AssignmentForm } from "@/components/trips/dispatch/assignment-form";
  * the current assignment (resource names + notes + override reason + assigned/confirmed by/at), the
  * retained supersession history chain (newest-first), and embeds the shared `AssignmentForm` for
  * assign/reassign/confirm/unassign. The form only renders when the trip is in an assignable status
- * (`validated`/`assigned`/`confirmed`); other statuses show the read-only history only. Read-first
- * freshness is the parent `useTripDetail` poll (no Realtime); all text is pt-BR.
+ * (`received`/`assigned`/`confirmed`; slice 015 retargeted off the removed `validated` state); other
+ * statuses show the read-only history only. Read-first freshness is the parent `useTripDetail` poll
+ * (no Realtime); all text is pt-BR.
  */
 
-const ASSIGNABLE_STATUSES = new Set(["validated", "assigned", "confirmed"]);
+const ASSIGNABLE_STATUSES = new Set(["received", "assigned", "confirmed"]);
 
 export function AssignmentPanel({
   trip,

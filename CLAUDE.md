@@ -67,41 +67,34 @@ Start with two packages (`shared`, `db`); add more only with justification.
 - Code style is enforced by ESLint/Prettier — not by this file. Tests: Vitest + Playwright.
 
 <!-- SPECKIT START -->
-Active feature plan: `specs/014-auto-validate-imports/plan.md` (Auto-Validate Imported Trips).
+Active feature plan: `specs/015-collapse-validation-statuses/plan.md` (Collapse Validation Statuses into "Recebida").
 For technologies, project structure, BFF/auth patterns, data model, contracts, and setup/test commands,
 read that plan and its `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`.
-This is a **corrective behavior change** to the import→dispatch flow that **references** shipped slices 004 (import
-pipeline), 006 (dispatch/assignment), 013 (predefined import template), and 003 (trip status machine) — it does **not**
-edit their shipped specs. **Problem**: imported trips land in trip status `received`, but assignment requires `validated`
-(`received → validated → assigned`), and there is **no operator UI** to make that hop (the assignment panel renders only
-for validated/assigned/confirmed; the execution-timeline milestone buttons exclude validated). So every imported trip is
-stranded before dispatch, and the Expedição (`/dispatch`) queue — which queries `assigned=false&scope=active`, and
-`scope=active` includes `received` — lists those trips with an "Atribuir" action that fails with `ILLEGAL_TRANSITION`
-("Operação não permitida para o status atual da viagem"). **Goal**: **auto-validate on import** — since the import
-pipeline already validates every row (outcome valid/warning/error, only valid/warning applied), a row that passed import
-validation **is** a validated trip; collapse the redundant trip-validation step. **Decision (spec §Clarifications,
-born-validated, atomic)**: extend the promoted `createTrip` (`packages/db/src/trips/trips-service.ts`) with an **optional
-3rd param `initialStatus: TripStatus = "received"`** (replacing the hardcoded `"received"` at the insert AND the
-`trip.create` audit `newValue`); the **two** `createTrip` sites in `workers/jobs/confirm-import/index.ts` (lines ~149
-`new`/`potential_duplicate`, ~171 `update`-vanished→create) pass `"validated"`. The trip is **born `validated`** in
-`createTrip`'s single transaction — never first persisted as `received` — so **no** worker-crash window can strand it
-(verified across crash/re-run orderings; a unique-key race re-resolves to a status-neutral `updateTripPlan`). **Critical
-invariant**: `updateTripPlan` paths (the `update` match decision and the race-fallback) and **all 9 other `createTrip`
-callers** (notably `manual-create.ts`, kept `received`) are **UNCHANGED** — an `update` to an already-`assigned`/
-`in_transit` trip must keep its status (FR-002). The legal-transition machine is **not** weakened: born-validated is an
-*initial* insert status, not a transition; transitions out of `validated` still route through the guarded
-`transitionTripStatus`. **Secondary fix**: narrow the dispatch queue — `apps/web/components/trips/dispatch/dispatch-board.tsx`
-`DISPATCH_QUERY` from `"assigned=false&scope=active&sort=pickupStart"` to **`"assigned=false&status=validated&sort=pickupStart"`**
-(a non-empty `status` suppresses the `scope=active` default in `buildWhere` and composes with `assigned=false` → only
-unassigned validated trips; `status` is read via `params.getAll`). **Adds NOTHING durable**: NO new table, column, enum
-value, migration, permission, package, worker job, or runtime dependency — reuses the existing `validated` enum value and
-the creation+audit path (one backward-compatible optional param). New work: 1 db-service edit (+2 confirm-import call-site
-args + header comment), 1 client query-string edit; tests — EDIT `workers/jobs/confirm-import/confirm.test.ts` (the
-`received`→`validated` assertion + add: update doesn't downgrade an assigned trip; a confirm-created trip assigns
-immediately), ADD a `dispatch-board.spec.ts` assertion (queue lists only validated; a seeded `received` trip excluded),
-EDIT `e2e/trip-import.spec.ts` (post-confirm trips show "Validada"). All dispatch e2e already seed `currentStatus:"validated"`
-(unchanged); `manual-create.test.ts`/`trips-service.test.ts` (default `received`) + `import-batches-service.test.ts` (batch
-status) UNCHANGED. Out of scope (Future): a manual "Validar" UI action; born-validating the manual trip-create path;
-backfilling pre-existing `received` trips; reaching `validation_error` via import (error rows never applied); history
-batch-failure visibility.
+This is a **corrective, cross-cutting** change to the trip status machine that **references** shipped slices 003 (status
+machine), 004 (import+validation), 006 (dispatch/assignment), 013 (predefined import template), 014 (auto-validate) — it
+**supersedes 014's born-`validated`** decision and does **not** edit shipped specs; it **amends** `docs/PRD.md`
+(§7, §9.1, §11.2/11.3/11.4, §12, §12.1, §19.1, §30). Constitution is **not** amended. **Scope (narrowed with the user
+2026-06-07)**: collapse ONLY the three validation states — `received` ("Recebida"), `validation_error` ("Erro de
+validação"), `validated` ("Validada") — into a single `received`. Remove `validation_error` + `validated` from the
+**active** machine (18 → **16** values); `received` becomes the first dispatchable status. The `confirmed` step and
+EVERYTHING `assigned`/`confirmed`-onward are **OUT OF SCOPE and UNCHANGED**. **Transitions**: `received → [assigned,
+cancelled]`; `assigned → [confirmed, received, cancelled]` (`received` = unassign, was `validated`); delete the
+`validation_error`/`validated` rows; `confirmed`-onward unchanged. `ACTIVE_TRIP_STATUSES` 12 → 10; `NON_EDITABLE` stays 6
+(partition 10+6=16). **DB enum stays at 18 (2 dormant)** — Postgres has no `DROP VALUE`; keep `validation_error`/`validated`
+in the `trip_status` pgEnum (frozen by 0002 + immutable `trip_events` history), mark them dormant, and **pin the Drizzle
+columns** `trips.current_status` + `trips.disputed_from_status` to the 16-value `TripStatus` via `.$type<TripStatus>()`
+(type-only, no SQL diff). **One durable add**: data-only migration **0008** (`--custom`) backfilling
+`current_status`/`disputed_from_status` ∈ {validated, validation_error} → `received` (FR-006); `trip_events` left intact.
+**Born-received**: REVERT 014 — drop `createTrip`'s `initialStatus` param; the two `confirm-import` create sites born
+`received`; manual-create already `received`. **Dispatch/assign**: `DISPATCH_QUERY` `status=validated` → `status=received`;
+`assignTrip` source guard + event/audit `validated` → `received`; `unassignTrip` target `assigned → received`; BFF assign
+branch key `validated` → `received`; `ASSIGNABLE_STATUSES`/quick-assign gate `received`; `trip-status-badge` + pt-BR drop
+the 2 keys; unassign dialog copy → "Recebida". **CRITICAL TRAPS**: (1) `import_batch_status` is a SEPARATE enum that ALSO
+has `validated`/`confirming` — NEVER blind find-replace `'validated'`; batch `setBatchStatus("validated")` and all
+`importBatches.status` refs STAY. (2) Several tests/e2e assert the OLD design and must **INVERT**, not just re-seed
+(dispatch-board "received excluded" → included; trip-import "Validada" → "Recebida"; delete the born-validated unit test).
+(3) `trip-plan.ts indexOf("confirmed")` stays valid (`confirmed` retained) — the full-collapse landmine does NOT arise here.
+**Restart the pg-boss worker** after editing `confirm-import` (stale worker masks the fix; the `trip.create` audit born
+status is the tell). Out of scope (Future): removing `confirmed`/the confirm step; any new status; SLA redesign; touching
+`import_batch_status`; a manual "Validar" UI.
 <!-- SPECKIT END -->

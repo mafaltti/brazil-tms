@@ -29,9 +29,9 @@ const optionalCount = z
   .optional();
 
 // ---------------------------------------------------------------------------
-// createTrip — capture the imported/seeded plan; the service snapshots `original_plan`. The born status
-// is the service's `initialStatus` param (default `received`; `validated` for imports — slice 014),
-// NOT a field on this schema.
+// createTrip — capture the imported/seeded plan; the service snapshots `original_plan`. Every trip is
+// born `received` (slice 015 collapsed the validation states and reverted slice 014's `initialStatus`
+// param; `received` is now the first dispatchable status), NOT a field on this schema.
 // ---------------------------------------------------------------------------
 
 export const createTripSchema = z

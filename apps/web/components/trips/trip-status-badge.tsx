@@ -5,15 +5,14 @@ import { cn } from "@/lib/utils";
 
 /**
  * pt-BR trip-status badge (005 R14, §16). Maps each `trip_status` to an accessible (WCAG-AA) colour by
- * lifecycle phase: intake = slate, error = red, planning = indigo, execution = blue, done = green,
- * billing = amber, terminal = red/gray. Follows the master-data status-badge pattern (Badge + i18n
- * label) but with a per-status colour so operators can scan the dense board. Renders in server or
- * client components (next-intl `useTranslations` is isomorphic).
+ * lifecycle phase: intake = slate, planning = indigo, execution = blue, done = green, billing = amber,
+ * terminal = red/gray. Follows the master-data status-badge pattern (Badge + i18n label) but with a
+ * per-status colour so operators can scan the dense board. Renders in server or client components
+ * (next-intl `useTranslations` is isomorphic). Slice 015 dropped the `validation_error`/`validated`
+ * keys (the `Record<TripStatus>` is now the 16-value machine).
  */
 const STATUS_CLASS: Record<TripStatus, string> = {
   received: "bg-slate-100 text-slate-700 border-slate-200",
-  validation_error: "bg-red-100 text-red-800 border-red-200",
-  validated: "bg-slate-100 text-slate-700 border-slate-200",
   assigned: "bg-indigo-100 text-indigo-800 border-indigo-200",
   confirmed: "bg-indigo-100 text-indigo-800 border-indigo-200",
   at_origin: "bg-blue-100 text-blue-800 border-blue-200",

@@ -67,7 +67,7 @@ let vanVehicleId = ""; // WARN: van vs planned truck
 let maintenanceVehicleId = ""; // BLOCK: maintenance
 const tripIds: string[] = [];
 
-async function seedValidatedTrip(): Promise<string> {
+async function seedReceivedTrip(): Promise<string> {
   const inserted = await db
     .insert(trips)
     .values({
@@ -75,7 +75,7 @@ async function seedValidatedTrip(): Promise<string> {
       externalTripId: code("EXT-OVR"),
       originLocationId: originId,
       destinationLocationId: destId,
-      currentStatus: "validated",
+      currentStatus: "received",
       originalPlan: { customerId, originLocationId: originId, destinationLocationId: destId },
       plannedVehicleType: "truck",
       plannedPickupWindowStart: new Date("2026-09-01T08:00:00.000Z"),
@@ -168,10 +168,10 @@ test.describe("US3 — override a WARN with a recorded reason", () => {
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
 
     const res = await ctx.post(`/api/trips/${tripId}/assignment`, {
-      data: { driverId, vehicleId: vanVehicleId, expectedFromStatus: "validated" },
+      data: { driverId, vehicleId: vanVehicleId, expectedFromStatus: "received" },
     });
     expect(res.status()).toBe(409);
     const body = (await res.json()) as { error: { code: string }; findings?: Finding[] };
@@ -183,13 +183,13 @@ test.describe("US3 — override a WARN with a recorded reason", () => {
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
 
     const res = await ctx.post(`/api/trips/${tripId}/assignment`, {
       data: {
         driverId,
         vehicleId: vanVehicleId,
-        expectedFromStatus: "validated",
+        expectedFromStatus: "received",
         overrideReason: OVERRIDE_REASON,
       },
     });
@@ -216,7 +216,7 @@ test.describe("US3 — override a WARN with a recorded reason", () => {
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
 
     // The schema trims + `min(1)` the reason, so a blank reason is a 400 — the override never reaches
     // the service. (A missing reason on a WARN is the 409 OVERRIDE_REQUIRED case above.)
@@ -224,7 +224,7 @@ test.describe("US3 — override a WARN with a recorded reason", () => {
       data: {
         driverId,
         vehicleId: vanVehicleId,
-        expectedFromStatus: "validated",
+        expectedFromStatus: "received",
         overrideReason: "   ",
       },
     });
@@ -235,25 +235,25 @@ test.describe("US3 — override a WARN with a recorded reason", () => {
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.nonAdmin);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
 
     const res = await ctx.post(`/api/trips/${tripId}/assignment`, {
       data: {
         driverId,
         vehicleId: vanVehicleId,
-        expectedFromStatus: "validated",
+        expectedFromStatus: "received",
         overrideReason: OVERRIDE_REASON,
       },
     });
     expect(res.status()).toBe(403);
 
-    // No state change: the trip is still validated/unassigned.
+    // No state change: the trip is still received/unassigned.
     const ops = await apiLogin(request, testAccounts.opsManager);
     const detail = await ops.get(`/api/trips/${tripId}`);
     const { item } = (await detail.json()) as {
       item: { currentStatus: string; currentAssignment: unknown };
     };
-    expect(item.currentStatus).toBe("validated");
+    expect(item.currentStatus).toBe("received");
     expect(item.currentAssignment).toBeNull();
   });
 
@@ -261,13 +261,13 @@ test.describe("US3 — override a WARN with a recorded reason", () => {
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
 
     const res = await ctx.post(`/api/trips/${tripId}/assignment`, {
       data: {
         driverId,
         vehicleId: maintenanceVehicleId,
-        expectedFromStatus: "validated",
+        expectedFromStatus: "received",
         overrideReason: OVERRIDE_REASON,
       },
     });

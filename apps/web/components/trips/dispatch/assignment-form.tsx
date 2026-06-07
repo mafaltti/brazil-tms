@@ -38,7 +38,8 @@ import { FindingsList } from "@/components/trips/dispatch/findings-list";
  * It picks driver/vehicle/trailer/carrier from the server-loaded `resourceOptions` (NOT the
  * `manage_fleet_data`-gated master-data APIs), shows LIVE server-authoritative findings via the
  * dry-run `useAssignmentCheck` endpoint (debounced as resources change), and routes the primary save
- * to assign (status `validated`) or reassign (`assigned`/`confirmed`). Confirm + Unassign are offered
+ * to assign (status `received`; slice 015, was `validated`) or reassign (`assigned`/`confirmed`).
+ * Confirm + Unassign are offered
  * on an `assigned` trip. Conflict authority is server-side: the form disables save on a BLOCK and
  * requires a non-empty override reason whenever a WARN is present (T045) — but the BFF re-enforces
  * both regardless of client state. All text is pt-BR.
@@ -155,7 +156,7 @@ export function AssignmentForm({
   const showConfirm = currentStatus === "assigned";
   const showUnassign = currentStatus === "assigned";
 
-  // The primary save (assign for `validated`, reassign for `assigned`/`confirmed`).
+  // The primary save (assign for `received`, reassign for `assigned`/`confirmed`).
   const saveMutation = isReassign ? reassign : assign;
   const savePending = saveMutation.isPending;
 

@@ -12,9 +12,10 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/trips/:id/assignment — assign **or** reassign resources (006, R9/R11). Requires
- * `assign_resources` (first enforced here). Branches on `expectedFromStatus`: a `validated` trip is
- * **assigned** (`validated → assigned`), an `assigned`/`confirmed` trip is **reassigned** (supersede
- * the current row, no status change). The service runs the server-authoritative eligibility evaluator
+ * `assign_resources` (first enforced here). Branches on `expectedFromStatus`: a `received` trip is
+ * **assigned** (`received → assigned`; slice 015 retargeted off the removed `validated` state), an
+ * `assigned`/`confirmed` trip is **reassigned** (supersede the current row, no status change). The
+ * service runs the server-authoritative eligibility evaluator
  * and may throw `Conflict(INCOMPLETE_ASSIGNMENT | OVERRIDE_REQUIRED | ASSIGNMENT_BLOCKED |
  * STALE_TRANSITION | ILLEGAL_TRANSITION | NOT_FOUND)` → 409 via `handleRouteError` (which surfaces the
  * `Finding[]` for OVERRIDE_REQUIRED/ASSIGNMENT_BLOCKED). Returns the trip + any overridden WARN findings.
@@ -30,7 +31,7 @@ export async function POST(
     const input = assignTripSchema.parse(await request.json());
 
     const result =
-      input.expectedFromStatus === "validated"
+      input.expectedFromStatus === "received"
         ? await assignTrip(id, input, ctx.userId)
         : await reassignTrip(id, input, ctx.userId);
 
@@ -47,7 +48,8 @@ export async function POST(
 
 /**
  * DELETE /api/trips/:id/assignment — unassign (006). Requires `assign_resources`. Supersedes the
- * current assignment (retained as history) and transitions `assigned → validated`. Body carries the
+ * current assignment (retained as history) and transitions `assigned → received` (slice 015; was
+ * `assigned → validated`). Body carries the
  * optimistic-concurrency `expectedFromStatus` (+ optional notes), validated with
  * `confirmAssignmentSchema`. Service may throw `Conflict(STALE_TRANSITION | ILLEGAL_TRANSITION |
  * NOT_FOUND)` → 409.

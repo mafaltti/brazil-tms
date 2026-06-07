@@ -43,7 +43,7 @@ describe.skipIf(!hasDb)("trips-read (integration)", () => {
 
   // Seeded trip ids, captured for FK-safe cleanup.
   let inTransitId = "";
-  let validatedId = "";
+  let receivedId = "";
   let completedId = "";
   let billingPendingId = "";
   let todayPickupId = "";
@@ -54,7 +54,7 @@ describe.skipIf(!hasDb)("trips-read (integration)", () => {
   const createdLocationIds: string[] = [];
   const createdCustomerIds: string[] = [];
 
-  // Feature 006 — a fleet fixture + an assignment on `validatedId` so the board assignment filters,
+  // Feature 006 — a fleet fixture + an assignment on `receivedId` so the board assignment filters,
   // the dashboard unassigned count, and the extended getTripFilterOptions have data to assert against.
   let actorId = "";
   let asgDriverId = "";
@@ -130,13 +130,13 @@ describe.skipIf(!hasDb)("trips-read (integration)", () => {
     const todayMidday = new Date(new Date(from).getTime() + 12 * 60 * 60 * 1000);
 
     inTransitId = await seedTrip("in_transit", new Date("2026-06-01T08:00:00.000Z"));
-    validatedId = await seedTrip("validated", new Date("2026-06-02T08:00:00.000Z"));
+    receivedId = await seedTrip("received", new Date("2026-06-02T08:00:00.000Z"));
     completedId = await seedTrip("completed", new Date("2026-06-03T08:00:00.000Z"));
     billingPendingId = await seedTrip("billing_pending", new Date("2026-06-04T08:00:00.000Z"));
     todayPickupId = await seedTrip("in_transit", todayMidday);
     extSearchId = inTransitId;
 
-    // 006 fleet + a current assignment on the validated trip (so board/dashboard/options have data).
+    // 006 fleet + a current assignment on the received trip (so board/dashboard/options have data).
     const admin = await db
       .select({ id: users.id })
       .from(users)
@@ -158,10 +158,10 @@ describe.skipIf(!hasDb)("trips-read (integration)", () => {
     asgVehicleId = vehicle[0]!.id;
     createdVehicleIds.push(asgVehicleId);
 
-    // Bind the fleet to `validatedId` as the single current assignment (direct insert — the read
+    // Bind the fleet to `receivedId` as the single current assignment (direct insert — the read
     // models only care about the `is_current` join, not the write-path transitions).
     await db.insert(tripAssignments).values({
-      tripId: validatedId,
+      tripId: receivedId,
       driverId: asgDriverId,
       vehicleId: asgVehicleId,
       assignedByUserId: actorId,
@@ -213,7 +213,7 @@ describe.skipIf(!hasDb)("trips-read (integration)", () => {
     const { rows } = await queryTripBoard(boardQuery());
     const ids = rows.map((r) => r.id);
     expect(ids).toContain(inTransitId);
-    expect(ids).toContain(validatedId);
+    expect(ids).toContain(receivedId);
     expect(ids).toContain(todayPickupId);
     expect(ids).not.toContain(completedId);
     expect(ids).not.toContain(billingPendingId);
@@ -235,9 +235,9 @@ describe.skipIf(!hasDb)("trips-read (integration)", () => {
   });
 
   it("AND-combines customer + status filters", async () => {
-    const { rows } = await queryTripBoard(boardQuery({ status: ["validated"] }));
+    const { rows } = await queryTripBoard(boardQuery({ status: ["received"] }));
     expect(rows.every((r) => r.customerId === customerId)).toBe(true);
-    expect(rows.map((r) => r.id)).toEqual([validatedId]);
+    expect(rows.map((r) => r.id)).toEqual([receivedId]);
   });
 
   it("status + billingStatus compose with AND (intersection), not else-if", async () => {
@@ -329,7 +329,7 @@ describe.skipIf(!hasDb)("trips-read (integration)", () => {
 
     // 006 — unassignedTrips is now a COUNT (active trips with no current assignment), no longer null.
     // This seed has active+unassigned trips (in_transit + today), so the count is ≥ 2; the assigned
-    // `validatedId` is excluded.
+    // `receivedId` is excluded.
     expect(metrics.unassignedTrips).not.toBeNull();
     expect(metrics.unassignedTrips!).toBeGreaterThanOrEqual(2);
 
@@ -352,11 +352,11 @@ describe.skipIf(!hasDb)("trips-read (integration)", () => {
   it("board assigned=true returns only assigned trips with the joined driver/vehicle names", async () => {
     const { rows } = await queryTripBoard(boardQuery({ scope: "all", assigned: "true" }));
     const ids = rows.map((r) => r.id);
-    expect(ids).toContain(validatedId); // the only assigned trip in this seed.
+    expect(ids).toContain(receivedId); // the only assigned trip in this seed.
     expect(ids).not.toContain(inTransitId);
     expect(rows.every((r) => r.isAssigned)).toBe(true);
 
-    const assignedRow = rows.find((r) => r.id === validatedId)!;
+    const assignedRow = rows.find((r) => r.id === receivedId)!;
     expect(assignedRow.assignedDriverName).toContain(seedToken);
     expect(assignedRow.assignedVehiclePlate).not.toBeNull();
   });
@@ -366,7 +366,7 @@ describe.skipIf(!hasDb)("trips-read (integration)", () => {
     const ids = rows.map((r) => r.id);
     expect(ids).toContain(inTransitId);
     expect(ids).toContain(completedId);
-    expect(ids).not.toContain(validatedId); // assigned → excluded.
+    expect(ids).not.toContain(receivedId); // assigned → excluded.
     expect(rows.every((r) => !r.isAssigned)).toBe(true);
     expect(rows.every((r) => r.assignedDriverName === null)).toBe(true);
   });
@@ -375,15 +375,15 @@ describe.skipIf(!hasDb)("trips-read (integration)", () => {
     const metrics = await queryDashboardMetrics();
     expect(metrics.unassignedTrips).not.toBeNull();
     // The active+unassigned trips in this seed (in_transit + today pickup) are counted; the ASSIGNED
-    // validated trip is excluded and completed/billing_pending are not active. This is a GLOBAL count
+    // received trip is excluded and completed/billing_pending are not active. This is a GLOBAL count
     // over the shared dev DB (concurrent suites mutate the total), so assert a floor — the two
     // active+unassigned trips this seed owns — never an exact value.
     expect(metrics.unassignedTrips!).toBeGreaterThanOrEqual(2);
 
-    // The assigned validated trip must NOT be in the count: the board's assigned=false lens (the same
+    // The assigned received trip must NOT be in the count: the board's assigned=false lens (the same
     // "no current assignment" predicate the dashboard uses) excludes it.
     const unassignedBoard = await queryTripBoard(boardQuery({ scope: "active", assigned: "false" }));
-    expect(unassignedBoard.rows.map((r) => r.id)).not.toContain(validatedId);
+    expect(unassignedBoard.rows.map((r) => r.id)).not.toContain(receivedId);
   });
 
   it("getTripFilterOptions returns the active (non-archived) fleet lists", async () => {

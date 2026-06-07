@@ -11,6 +11,7 @@ import {
   reasonCodes,
   tripAssignments,
   tripEvents,
+  tripStatus,
   trailers,
   trips,
   users,
@@ -63,11 +64,20 @@ export interface TripSummary {
   updatedAt: string;
 }
 
+/**
+ * The physical `trip_status` domain (18 members) — `trip_events` is immutable history that MAY still
+ * carry the slice-015 dormant values (`validation_error`/`validated`) on rows written before the
+ * collapse, even though no live writer produces them. The ACTIVE machine (`TripStatus`) is 16; this
+ * history-reader type admits the two dormant values so event DTOs reflect what is physically stored.
+ * The timeline renders these defensively (raw string for any non-active status — no i18n key needed).
+ */
+export type TripEventStatus = (typeof tripStatus.enumValues)[number];
+
 export interface TripEventDto {
   id: string;
   eventType: TripEventType;
-  statusBefore: TripStatus | null;
-  statusAfter: TripStatus | null;
+  statusBefore: TripEventStatus | null;
+  statusAfter: TripEventStatus | null;
   eventTimestamp: string | null;
   source: TripEventSource;
   actorUserId: string | null;

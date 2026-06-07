@@ -12,13 +12,13 @@
  */
 
 // ---------------------------------------------------------------------------
-// Status set (18 values, lifecycle order — R2, FR-008)
+// Status set (16 values, lifecycle order — R2, FR-008; slice 015 collapsed the
+// validation states — `validation_error`/`validated` removed, `received` is now
+// the first dispatchable status)
 // ---------------------------------------------------------------------------
 
 export const TRIP_STATUSES = [
   "received",
-  "validation_error",
-  "validated",
   "assigned",
   "confirmed",
   "at_origin",
@@ -82,10 +82,8 @@ export type ResponsibleParty = (typeof CANCELLATION_RESPONSIBLE_PARTIES)[number]
  * `completed`/`disputed`. `cancelled` is terminal.
  */
 export const TRANSITIONS: Record<TripStatus, readonly TripStatus[]> = {
-  received: ["validated", "validation_error", "cancelled"],
-  validation_error: ["received"],
-  validated: ["assigned", "cancelled"],
-  assigned: ["confirmed", "validated", "cancelled"], // validated = unassign
+  received: ["assigned", "cancelled"], // slice 015: `received` is now the first dispatchable status
+  assigned: ["confirmed", "received", "cancelled"], // received = unassign (slice 015; was validated)
   confirmed: ["at_origin", "cancelled"],
   at_origin: ["loading", "in_transit", "cancelled"],
   loading: ["loaded", "cancelled"],
@@ -177,13 +175,11 @@ export const TRIP_CRITICAL_FIELDS = [
  * The active/open operating set — the non-terminal statuses a control tower monitors (005 R4). The
  * Control Tower board defaults to this set, the implicit `scope=active` filter uses it, and the daily
  * dashboard counts it. It is exactly the complement of {@link NON_EDITABLE_TRIP_STATUSES} within the
- * 18-value machine (12 active + 6 closed = 18); the two are pinned complementary by a unit test.
+ * 16-value machine (10 active + 6 closed = 16); the two are pinned complementary by a unit test.
  * Order matches {@link TRIP_STATUSES}.
  */
 export const ACTIVE_TRIP_STATUSES = [
   "received",
-  "validation_error",
-  "validated",
   "assigned",
   "confirmed",
   "at_origin",

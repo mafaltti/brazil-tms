@@ -287,9 +287,9 @@ System checks:
 - Trip is not a duplicate.
 - Trip does not conflict with already accepted customer updates.
 
-Validation outcomes:
+Validation outcomes (per imported row; see §11.1):
 
-- Valid: trip can move to planning or assignment.
+- Valid: the row creates/updates a trip born `Received` — itself dispatchable, ready for assignment (slice 015; there is no separate trip-level "Validated" hop).
 - Warning: trip can proceed but requires user attention.
 - Error: trip cannot proceed until corrected.
 
@@ -365,9 +365,7 @@ The system should support the following standard statuses:
 
 | Status | Meaning | Typical Owner |
 |---|---|---|
-| Received | Trip imported or manually created | Operations |
-| Validation Error | Trip has blocking data issue | Operations |
-| Validated | Trip data is complete enough to execute | Operations |
+| Received | Trip imported or manually created; the first **dispatchable** status | Operations |
 | Assigned | Driver, vehicle, and/or carrier assigned | Dispatcher |
 | Confirmed | Assignment confirmed for execution | Dispatcher |
 | At Origin | Vehicle arrived at pickup location | Control Tower |
@@ -392,10 +390,8 @@ Transitions not listed are invalid and must be rejected by the status machine (S
 
 | From | Allowed next | Trigger / owner |
 |---|---|---|
-| Received | Validated, Validation Error, Cancelled | System validation / Operations |
-| Validation Error | Received | Operations (after correction) |
-| Validated | Assigned, Cancelled | Dispatcher |
-| Assigned | Confirmed, Validated (unassign), Cancelled | Dispatcher |
+| Received | Assigned, Cancelled | Dispatcher / Operations |
+| Assigned | Confirmed, Received (unassign), Cancelled | Dispatcher |
 | Confirmed | At Origin, Cancelled | Control Tower |
 | At Origin | Loading, In Transit, Cancelled | Control Tower |
 | Loading | Loaded, Cancelled | Control Tower |
@@ -416,7 +412,8 @@ Notes:
 - **Loading** and **Unloading** are optional sub-states; operations may skip directly (At Origin → In Transit, At Destination → Unloaded).
 - **Cancelled** is allowed from any non-terminal status before **Completed**, and requires the Section 19.5 cancellation data.
 - **Disputed** records the status it was entered from so it can return there on resolution; dispute detail is tracked on the Billing Item (Section 14).
-- A **Warning** validation outcome (11.2) is not a status — it is a flag on a `Received`/`Validated` trip that needs attention but does not block progression.
+- A **Warning** validation outcome (11.2) is not a status — it is a flag on a `Received` trip that needs attention but does not block progression.
+- **Slice 015** collapsed the three former validation states (`Received`, `Validation Error`, `Validated`) into a single `Received`, which is now the first dispatchable status (the redundant trip-level validate hop was removed; import already validates per row). This supersedes slice 014's born-`Validated` decision — imported trips are born `Received`. See §30.
 
 ### 12.2 SLA Status
 
@@ -1639,3 +1636,4 @@ Decisions made to bring this PRD to execution-readiness. Override any of these i
 - **Permissions** (Section 18): added Cancel, Mark Completed, Mark Billing Ready, Resolve dispute, Delete/Archive.
 - **Localization** (21.6): i18n from day one; MVP UI in pt-BR.
 - **SLA milestone data**: MVP SLA computed from pickup/delivery windows + assignment/confirmation cutoffs; per-milestone planned times deferred to Input #2.
+- **Collapse validation statuses** (slice 015, 2026-06-07): the three early validation states — `Received`, `Validation Error`, `Validated` — are collapsed into a single `Received`, which becomes the first **dispatchable** status (§12, §12.1). Import already validates every row (only Valid/Warning rows are applied), so a separate trip-level validate hop carried no information. The active status machine drops from 18 to 16 values; `Assigned`/`Confirmed` and everything from `Confirmed` onward are unchanged (the confirm step and the confirmation-cutoff SLA are out of scope). This **supersedes slice 014's born-`Validated`** decision: imported trips are now born `Received`, and assign/unassign run `Received → Assigned` / `Assigned → Received`. The `trip_status` DB enum keeps all 18 physical members (Postgres has no `DROP VALUE`); the two removed values become **dormant** (retained only for immutable `trip_events` history) and a one-time data migration backfills any live trip off them. The separate `import_batch_status` enum (which also has `validated`) is untouched.

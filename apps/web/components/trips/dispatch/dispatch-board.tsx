@@ -20,19 +20,19 @@ import { useTripBoard } from "@/lib/trips/client";
 /**
  * The Dispatch Board (006 US5, §15.6): the dispatcher's daily workspace — the unassigned-by-pickup
  * queue with an inline assign action per trip. It reads the SAME extended board the Control Tower
- * uses, pinned to `assigned=false&status=validated&sort=pickupStart`, so resource availability and
+ * uses, pinned to `assigned=false&status=received&sort=pickupStart`, so resource availability and
  * conflict state reflect the latest poll (30s, built into `useTripBoard` — NO Realtime). Assigning
  * uses the SAME shared `AssignmentForm` (one write path, FR-022); the form surfaces server-authoritative
  * findings as the dispatcher picks. Focused queue — availability is the trip's pickup ordering plus the
  * form's live conflict check, not a separate resource-calendar widget (kept minimal per the brief).
  *
- * Slice 014 (FR-006): the queue is narrowed to `status=validated` (a non-empty status suppresses the
- * `scope=active` default in `buildWhere`) so it lists ONLY unassigned `validated` trips — every "Atribuir"
- * it offers can succeed (`validated → assigned`); it never surfaces a `received` trip whose assign would
- * fail with ILLEGAL_TRANSITION.
+ * Slice 015 (FR-006): the queue is narrowed to `status=received` (a non-empty status suppresses the
+ * `scope=active` default in `buildWhere`) so it lists ONLY unassigned `received` trips — every "Atribuir"
+ * it offers can succeed (`received → assigned`). The validation states were collapsed into `received`,
+ * which is now the first dispatchable status (slice 015 superseded slice 014's `status=validated` queue).
  */
 
-const DISPATCH_QUERY = "assigned=false&status=validated&sort=pickupStart";
+const DISPATCH_QUERY = "assigned=false&status=received&sort=pickupStart";
 
 export function DispatchBoard({ resourceOptions }: { resourceOptions: TripFilterOptions }) {
   const t = useTranslations("Dispatch");

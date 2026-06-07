@@ -115,10 +115,10 @@ describe.skipIf(!hasDb)("trip-transitions (integration)", () => {
 
   it("accepts the full legal lifecycle path (skipping the optional loading sub-state)", async () => {
     const tripId = await createTripAt("received");
+    // slice 015: `received → assigned` directly (the `validated` hop was collapsed away).
     // at_origin → in_transit legally SKIPS the optional `loading`/`loaded` sub-states.
     const path: [TripStatus, TripStatus][] = [
-      ["received", "validated"],
-      ["validated", "assigned"],
+      ["received", "assigned"],
       ["assigned", "confirmed"],
       ["confirmed", "at_origin"],
       ["at_origin", "in_transit"],
@@ -155,20 +155,22 @@ describe.skipIf(!hasDb)("trip-transitions (integration)", () => {
 
   it("rejects a stale transition when expectedFromStatus does not match the row (STALE_TRANSITION)", async () => {
     const tripId = await createTripAt("received");
-    // The caller believes the trip is at 'validated' (a legal source for 'assigned', so it passes the
+    // The caller believes the trip is at 'assigned' (a legal source for 'confirmed', so it passes the
     // legality gate), but the row is actually still at 'received'. The status-guarded UPDATE matches 0
-    // rows → STALE_TRANSITION, distinct from an illegal transition (the trip never moved).
+    // rows → STALE_TRANSITION, distinct from an illegal transition (the trip never moved). (slice 015
+    // re-pointed this off the removed `validated` source: `assigned` is now `received`'s only legal
+    // source, so the stale probe uses the `assigned → confirmed` pair instead.)
     await expect(
       transitionTripStatus(
         tripId,
-        { toStatus: "assigned", expectedFromStatus: "validated" },
+        { toStatus: "confirmed", expectedFromStatus: "assigned" },
         actorId,
       ),
     ).rejects.toBeInstanceOf(Conflict);
     await expect(
       transitionTripStatus(
         tripId,
-        { toStatus: "assigned", expectedFromStatus: "validated" },
+        { toStatus: "confirmed", expectedFromStatus: "assigned" },
         actorId,
       ),
     ).rejects.toMatchObject({ code: "STALE_TRANSITION" });
@@ -179,10 +181,10 @@ describe.skipIf(!hasDb)("trip-transitions (integration)", () => {
     const tripId = await createTripAt("received");
     const detail = await transitionTripStatus(
       tripId,
-      { toStatus: "validated", expectedFromStatus: "received" },
+      { toStatus: "assigned", expectedFromStatus: "received" },
       actorId,
     );
-    expect(detail.currentStatus).toBe("validated");
+    expect(detail.currentStatus).toBe("assigned");
 
     const events = await db
       .select()
@@ -190,7 +192,7 @@ describe.skipIf(!hasDb)("trip-transitions (integration)", () => {
       .where(and(eq(tripEvents.tripId, tripId), eq(tripEvents.eventType, "status_change")));
     expect(events).toHaveLength(1);
     expect(events[0]!.statusBefore).toBe("received");
-    expect(events[0]!.statusAfter).toBe("validated");
+    expect(events[0]!.statusAfter).toBe("assigned");
 
     const audits = await db
       .select()
@@ -203,8 +205,7 @@ describe.skipIf(!hasDb)("trip-transitions (integration)", () => {
     // Drive a trip to completed via the legal path.
     const tripId = await createTripAt("received");
     const toCompleted: [TripStatus, TripStatus][] = [
-      ["received", "validated"],
-      ["validated", "assigned"],
+      ["received", "assigned"],
       ["assigned", "confirmed"],
       ["confirmed", "at_origin"],
       ["at_origin", "in_transit"],

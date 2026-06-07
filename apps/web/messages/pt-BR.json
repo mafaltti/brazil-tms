@@ -823,8 +823,6 @@
     "subtitle": "Acompanhe, busque e filtre todas as viagens.",
     "status": {
       "received": "Recebida",
-      "validation_error": "Erro de validação",
-      "validated": "Validada",
       "assigned": "Atribuída",
       "confirmed": "Confirmada",
       "at_origin": "Na origem",
@@ -1276,7 +1274,7 @@
     "confirming": "Confirmando...",
     "unassigning": "Removendo...",
     "unassignConfirmTitle": "Remover atribuição",
-    "unassignConfirmBody": "Os recursos serão removidos e a viagem voltará para Validada. O histórico é mantido.",
+    "unassignConfirmBody": "Os recursos serão removidos e a viagem voltará para Recebida. O histórico é mantido.",
     "unassignConfirmAction": "Remover",
     "assignSuccess": "Atribuição salva.",
     "confirmSuccess": "Atribuição confirmada.",

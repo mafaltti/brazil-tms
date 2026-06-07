@@ -28,7 +28,7 @@ import { testAccounts } from "./test-config";
  * contract-expired = BLOCK; schedule overlap, vehicle-type mismatch & missing docs = WARN.
  *
  * Self-seeds via `@brazil-tms/db`: one customer + locations + a spread of resources with deliberately
- * problematic states, plus `validated` trips with planned windows. FK-safe cleanup; unique ids.
+ * problematic states, plus `received` trips with planned windows. FK-safe cleanup; unique ids.
  */
 
 const ADMIN_EMAIL = "admin@braziltransports.com.br";
@@ -96,7 +96,7 @@ let overlapTripB = "";
 const WINDOW_START = new Date("2026-08-01T08:00:00.000Z");
 const WINDOW_END = new Date("2026-08-01T18:00:00.000Z");
 
-async function seedValidatedTrip(plannedVehicleType: string | null = "truck"): Promise<string> {
+async function seedReceivedTrip(plannedVehicleType: string | null = "truck"): Promise<string> {
   const inserted = await db
     .insert(trips)
     .values({
@@ -104,7 +104,7 @@ async function seedValidatedTrip(plannedVehicleType: string | null = "truck"): P
       externalTripId: code("EXT-WARN"),
       originLocationId: originId,
       destinationLocationId: destId,
-      currentStatus: "validated",
+      currentStatus: "received",
       originalPlan: { customerId, originLocationId: originId, destinationLocationId: destId },
       plannedVehicleType,
       plannedPickupWindowStart: WINDOW_START,
@@ -201,8 +201,8 @@ test.beforeAll(async () => {
   // over a window that intersects trip B's window; picking the same resources for B must flag
   // schedule_conflict. The general `cleanDriver/cleanVehicle` are NEVER pre-assigned, so they stay
   // conflict-free for every other test (incl. "clean resources → no findings").
-  overlapTripA = await seedValidatedTrip();
-  overlapTripB = await seedValidatedTrip();
+  overlapTripA = await seedReceivedTrip();
+  overlapTripB = await seedReceivedTrip();
   await db.insert(tripAssignments).values({
     tripId: overlapTripA,
     driverId: overlapDriverId,
@@ -257,7 +257,7 @@ test.describe("US2 — each §19.2 finding surfaces with the right severity (dry
 
   test("vehicle in maintenance → resource_status BLOCK", async ({ request }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
     const res = await ctx.post(`/api/trips/${tripId}/assignment/check`, {
       data: { driverId: cleanDriverId, vehicleId: maintenanceVehicleId },
     });
@@ -271,7 +271,7 @@ test.describe("US2 — each §19.2 finding surfaces with the right severity (dry
 
   test("vehicle type ≠ planned type → vehicle_type WARN", async ({ request }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip("truck"); // planned truck, pick a van
+    const tripId = await seedReceivedTrip("truck"); // planned truck, pick a van
     const res = await ctx.post(`/api/trips/${tripId}/assignment/check`, {
       data: { driverId: cleanDriverId, vehicleId: vanVehicleId },
     });
@@ -285,7 +285,7 @@ test.describe("US2 — each §19.2 finding surfaces with the right severity (dry
 
   test("carrier with expired contract → carrier_eligibility BLOCK", async ({ request }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
     const res = await ctx.post(`/api/trips/${tripId}/assignment/check`, {
       data: { driverId: cleanDriverId, vehicleId: cleanVehicleId, carrierId: expiredCarrierId },
     });
@@ -299,7 +299,7 @@ test.describe("US2 — each §19.2 finding surfaces with the right severity (dry
 
   test("driver with an expired license → documentation BLOCK", async ({ request }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
     const res = await ctx.post(`/api/trips/${tripId}/assignment/check`, {
       data: { driverId: expiredLicenseDriverId, vehicleId: cleanVehicleId },
     });
@@ -313,7 +313,7 @@ test.describe("US2 — each §19.2 finding surfaces with the right severity (dry
 
   test("vehicle with missing documentation → documentation WARN", async ({ request }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
     const res = await ctx.post(`/api/trips/${tripId}/assignment/check`, {
       data: { driverId: cleanDriverId, vehicleId: missingDocVehicleId },
     });
@@ -327,7 +327,7 @@ test.describe("US2 — each §19.2 finding surfaces with the right severity (dry
 
   test("clean resources → no findings", async ({ request }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
     const res = await ctx.post(`/api/trips/${tripId}/assignment/check`, {
       data: { driverId: cleanDriverId, vehicleId: cleanVehicleId },
     });
@@ -342,7 +342,7 @@ test.describe("US2 — a BLOCK is server-authoritative (UI bypassed)", () => {
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip();
+    const tripId = await seedReceivedTrip();
 
     // The UI would disable Save on a BLOCK; posting directly proves the server still refuses it. A
     // maintenance vehicle is a BLOCK and is not overridable, even with an override reason supplied.
@@ -350,7 +350,7 @@ test.describe("US2 — a BLOCK is server-authoritative (UI bypassed)", () => {
       data: {
         driverId: cleanDriverId,
         vehicleId: maintenanceVehicleId,
-        expectedFromStatus: "validated",
+        expectedFromStatus: "received",
         overrideReason: "Tentativa de ignorar bloqueio",
       },
     });
@@ -359,12 +359,12 @@ test.describe("US2 — a BLOCK is server-authoritative (UI bypassed)", () => {
     expect(body.error.code).toBe("ASSIGNMENT_BLOCKED");
     expect(body.findings && body.findings.some((f) => f.severity === "block")).toBe(true);
 
-    // No state change: the trip is still `validated` with no current assignment.
+    // No state change: the trip is still `received` with no current assignment.
     const detail = await ctx.get(`/api/trips/${tripId}`);
     const { item } = (await detail.json()) as {
       item: { currentStatus: string; currentAssignment: unknown };
     };
-    expect(item.currentStatus).toBe("validated");
+    expect(item.currentStatus).toBe("received");
     expect(item.currentAssignment).toBeNull();
   });
 
@@ -372,11 +372,11 @@ test.describe("US2 — a BLOCK is server-authoritative (UI bypassed)", () => {
     request,
   }) => {
     const ctx = await apiLogin(request, testAccounts.opsManager);
-    const tripId = await seedValidatedTrip("truck");
+    const tripId = await seedReceivedTrip("truck");
 
     // A van vs planned truck is a WARN; without an override reason the server refuses.
     const res = await ctx.post(`/api/trips/${tripId}/assignment`, {
-      data: { driverId: cleanDriverId, vehicleId: vanVehicleId, expectedFromStatus: "validated" },
+      data: { driverId: cleanDriverId, vehicleId: vanVehicleId, expectedFromStatus: "received" },
     });
     expect(res.status()).toBe(409);
     const body = (await res.json()) as { error: { code: string }; findings?: Finding[] };
