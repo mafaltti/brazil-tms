@@ -6,8 +6,9 @@ exceptions, store proof, and prepare billing exports. **Not** a route optimizer.
 
 ## Repo status
 
-Planning + Spec-Driven Development phase. **No application code yet** — the repo is
-docs + GitHub Spec Kit scaffolding. Build work happens feature-by-feature via Spec Kit.
+MVP implemented (slices 001–015 merged to `dev`; `main` holds no code — the promotion
+was reverted and re-promotion is human-only). Build work continues feature-by-feature
+via Spec Kit; the monorepo is `apps/web` + `packages/{shared,db}` + `workers` + `infra`.
 
 ## Documentation map (read the relevant one before working)
 
