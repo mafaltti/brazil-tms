@@ -76,7 +76,48 @@
     "billing": "Faturamento",
     "rates": "Tarifas",
     "documentRequirements": "Requisitos de Documentos",
-    "reports": "Relatórios"
+    "reports": "Relatórios",
+    "freightRates": "Tabela de Fretes"
+  },
+  "FreightRates": {
+    "screenTitle": "Tabela de Fretes",
+    "description": "Consulta de fretes de agregados por rota, veículo e preço.",
+    "filters": {
+      "originUf": "UF Origem",
+      "originCity": "Cidade Origem",
+      "destinationUf": "UF Destino",
+      "destinationCity": "Cidade Destino",
+      "priceMin": "Preço mínimo (R$)",
+      "priceMax": "Preço máximo (R$)",
+      "cityPlaceholder": "Digite a cidade",
+      "all": "Todas",
+      "clear": "Limpar filtros"
+    },
+    "columns": {
+      "origin": "Origem",
+      "destination": "Destino",
+      "km": "Km",
+      "vehicleType": "Tipo de Veículo",
+      "valorIda": "Valor Ida",
+      "valorReversa": "Valor Reversa",
+      "observacoes": "Observações"
+    },
+    "empty": {
+      "noData": "Tabela de fretes ainda não carregada.",
+      "noDataCanImport": "Tabela de fretes ainda não carregada. Envie a planilha para começar.",
+      "noMatches": "Nenhuma rota encontrada com os filtros atuais."
+    },
+    "upload": {
+      "trigger": "Enviar planilha",
+      "title": "Substituir tabela de fretes",
+      "description": "Envie a planilha padrão (aba \"Controle de Fretes\"). A tabela inteira será substituída pelo conteúdo do arquivo.",
+      "submit": "Substituir tabela",
+      "submitting": "Enviando…",
+      "success": "Tabela substituída: {routes} rotas e {rates} tarifas carregadas.",
+      "issueRow": "Linha",
+      "issueColumn": "Coluna",
+      "issueMessage": "Problema"
+    }
   },
   "Roles": {
     "admin": "Administrador",
@@ -305,7 +346,8 @@
     "rate_create": "Tarifa criada",
     "rate_update": "Tarifa atualizada",
     "billing_item_update": "Item de faturamento atualizado",
-    "billing_export": "Exportação de faturamento gerada"
+    "billing_export": "Exportação de faturamento gerada",
+    "freight_rate_replace": "Tabela de fretes substituída"
   },
   "Documents": {
     "title": "Documentos",

@@ -238,6 +238,8 @@ The MVP should include:
 - User roles and permissions.
 - Audit trail for critical changes.
 - Portuguese (pt-BR) UI with i18n scaffolding from day one (see 21.6).
+- Internal agregados freight rate lookup ("Tabela de Fretes") with spreadsheet
+  replace-by-upload (added 2026-07-13, see 13.14 and 30).
 
 ### 10.2 Post-MVP Scope
 
@@ -590,6 +592,22 @@ MVP computes SLA status from the planned pickup window, planned delivery window,
 | AUTH-004 | Customer Viewer users can only access trips belonging to their customer. | Later |
 | AUTH-005 | System records audit history for critical actions. | MVP |
 | AUTH-006 | System supports single sign-on. | Later |
+
+### 13.14 Freight Rate Lookup (Agregados)
+
+Internal spot-price table for agregado (owner-operator) freight, maintained as a
+spreadsheet outside the system and replaced wholesale on upload. Unrelated to
+customer lane pricing (LANE-004) and to customer trip intake (13.3). Added
+2026-07-13 (see 30); implemented by feature slice 016.
+
+| ID | Requirement | Priority |
+|---|---|---|
+| RATE-LOOKUP-001 | System maintains an internal freight rate table: route (origin UF/city, destination UF/city), distance (km), vehicle type, one-way price, return price, and notes. | MVP |
+| RATE-LOOKUP-002 | Internal users can search and filter rates by origin UF/city, destination UF/city and one-way price range, with sorting by price and distance. | MVP |
+| RATE-LOOKUP-003 | Results display distance, vehicle type, both prices and notes in pt-BR with BRL formatting; missing values render as "—". | MVP |
+| RATE-LOOKUP-004 | Authorized users (Admin, Finance) replace the entire table by uploading the standard spreadsheet; the replace is atomic and a rejected file changes nothing, reporting row-level errors. | MVP |
+| RATE-LOOKUP-005 | Every successful import is recorded (file name, user, timestamp, counts) and appears in the audit trail. | MVP |
+| RATE-LOOKUP-006 | Freight rate data is restricted to internal roles and never exposed on customer-facing surfaces. | MVP |
 
 ## 14. Data Model
 
@@ -1163,6 +1181,24 @@ Required features:
 - SLA rules.
 - Rate tables.
 
+### 15.13 Freight Rates (Tabela de Fretes)
+
+Purpose:
+
+- Look up agregado spot prices by route without opening the spreadsheet.
+
+Required features:
+
+- Filters: origin UF/city, destination UF/city, one-way price range.
+- Columns: origin, destination, km, vehicle type, one-way price, return price, notes.
+- Sorting by one-way price and by distance (missing values last).
+- Spreadsheet upload (Admin, Finance) that atomically replaces the whole table,
+  with row-level errors on rejection.
+- Empty states for "table not loaded yet" and "no rates match the filters".
+
+The navigation label is "Tabela de Fretes" — "Rotas" already names the Lanes screen
+(15.12 master data).
+
 ## 16. UX Requirements
 
 The product should feel like an operational control system, not a marketing website.
@@ -1237,6 +1273,8 @@ Recommended permission matrix:
 | Edit rates | Yes | No | No | No | No | Yes | No | No |
 | Export billing | Yes | No | No | No | No | Yes | No | No |
 | Manage users | Yes | No | No | No | No | No | No | No |
+| View freight rate table (13.14) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No |
+| Import freight rate table (13.14) | Yes | No | No | No | No | Yes | No | No |
 
 ## 19. Business Rules
 
@@ -1637,3 +1675,5 @@ Decisions made to bring this PRD to execution-readiness. Override any of these i
 - **Localization** (21.6): i18n from day one; MVP UI in pt-BR.
 - **SLA milestone data**: MVP SLA computed from pickup/delivery windows + assignment/confirmation cutoffs; per-milestone planned times deferred to Input #2.
 - **Collapse validation statuses** (slice 015, 2026-06-07): the three early validation states — `Received`, `Validation Error`, `Validated` — are collapsed into a single `Received`, which becomes the first **dispatchable** status (§12, §12.1). Import already validates every row (only Valid/Warning rows are applied), so a separate trip-level validate hop carried no information. The active status machine drops from 18 to 16 values; `Assigned`/`Confirmed` and everything from `Confirmed` onward are unchanged (the confirm step and the confirmation-cutoff SLA are out of scope). This **supersedes slice 014's born-`Validated`** decision: imported trips are now born `Received`, and assign/unassign run `Received → Assigned` / `Assigned → Received`. The `trip_status` DB enum keeps all 18 physical members (Postgres has no `DROP VALUE`); the two removed values become **dormant** (retained only for immutable `trip_events` history) and a one-time data migration backfills any live trip off them. The separate `import_batch_status` enum (which also has `validated`) is untouched.
+
+- **Freight rate lookup (slice 016, 2026-07-13)**: NEW scope added on the product owner's request — an internal agregados spot-price table ("Tabela de Fretes", 13.14 / 15.13) searchable by route and one-way price, replaced wholesale by uploading the standard spreadsheet (Admin + Finance, mirroring the "Edit rates" precedent in Section 18). Deliberately separate from customer lane pricing (LANE-004): lane rates are contracted per customer; this table is agregado spot pricing maintained outside the system. Vehicle types are free-form labels from the sheet (not the fleet vehicle-type enum) so new labels never require a migration. The spreadsheet holds commercial data and must never enter the (public) repository — tests and seeds are synthetic.

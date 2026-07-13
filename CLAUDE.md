@@ -67,7 +67,23 @@ Start with two packages (`shared`, `db`); add more only with justification.
 - Code style is enforced by ESLint/Prettier — not by this file. Tests: Vitest + Playwright.
 
 <!-- SPECKIT START -->
-Active feature plan: `specs/015-collapse-validation-statuses/plan.md` (Collapse Validation Statuses into "Recebida").
+Active feature plan: `specs/016-freight-rate-lookup/plan.md` (Freight Rate Lookup / "Tabela de Fretes").
+For structure, data model, contracts and manual verification read that plan plus its `research.md`,
+`data-model.md`, `contracts/freight-rates-api.md` and `quickstart.md`. **New, additive slice** — no
+shipped spec is edited; `docs/PRD.md` is amended (§10.1, new §13.14 RATE-LOOKUP-001..006, new §15.13,
+§18 two rows, §30 decision entry). Key facts: internal agregados spot-price table, SEPARATE from the
+`rates` domain (slice 008 lane pricing) and from the Lanes screen (nav label "Rotas" belongs to Lanes —
+this tab is "Tabela de Fretes", route `/freight-rates`, tables `freight_rates`/`freight_rate_imports`,
+migration 0009). Replace-all upload parsed SYNCHRONOUSLY in the BFF (research R1 — no pg-boss job, no
+Storage persistence); permission keys `view_freight_rates` (7 internal roles) / `import_freight_rates`
+(Admin+Finance); money integer centavos; vehicle type is a free-text uppercased label (NOT the fleet
+enum, research R3); audit action `freight_rate.replace` (registered in shared actions + AuditActions
+i18n). **The repo is PUBLIC: the real FRETES AGREGADOS spreadsheet (prices/partners/routes) must NEVER
+be committed** — tests/fixtures/seeds are synthetic (spec FR-009); manual verification with the real
+sheet is quickstart-only. City filtering is client-side accent-insensitive over the polled dataset
+(research R5); UF/price/sort are server-side; freshness = TanStack polling 30 s (NO Realtime).
+
+Previous slice (015) context, still load-bearing:
 For technologies, project structure, BFF/auth patterns, data model, contracts, and setup/test commands,
 read that plan and its `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`.
 This is a **corrective, cross-cutting** change to the trip status machine that **references** shipped slices 003 (status

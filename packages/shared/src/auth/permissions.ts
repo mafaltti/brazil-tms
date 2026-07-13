@@ -46,7 +46,11 @@ export type PermissionKey =
   | "manage_commercial_data"
   | "manage_fleet_data"
   // added by 003 (trip domain): create/transition/plan-update/cancel trips + read trip inspector:
-  | "manage_trips";
+  | "manage_trips"
+  // added by 016 (freight rate lookup): internal agregados rate table — view for the 7 internal
+  // roles, replace-by-upload mirrors the "edit_rates" precedent (Admin + Finance):
+  | "view_freight_rates"
+  | "import_freight_rates";
 
 export const ALL_PERMISSIONS: readonly PermissionKey[] = [
   "manage_users",
@@ -70,6 +74,8 @@ export const ALL_PERMISSIONS: readonly PermissionKey[] = [
   "manage_commercial_data",
   "manage_fleet_data",
   "manage_trips",
+  "view_freight_rates",
+  "import_freight_rates",
 ];
 
 // Admin is a superset of every permission (matrix invariant).
@@ -94,6 +100,7 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<PermissionKey>> = {
     "manage_commercial_data",
     "manage_fleet_data",
     "manage_trips",
+    "view_freight_rates",
   ]),
   dispatcher: new Set<PermissionKey>([
     "view_all_trips",
@@ -104,6 +111,7 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<PermissionKey>> = {
     "create_exceptions",
     "resolve_exceptions",
     "upload_documents",
+    "view_freight_rates",
   ]),
   control_tower: new Set<PermissionKey>([
     "view_all_trips",
@@ -113,6 +121,7 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<PermissionKey>> = {
     "create_exceptions",
     "resolve_exceptions",
     "upload_documents",
+    "view_freight_rates",
   ]),
   fleet_coordinator: new Set<PermissionKey>([
     "view_all_trips",
@@ -121,6 +130,7 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<PermissionKey>> = {
     "resolve_exceptions",
     "upload_documents",
     "manage_fleet_data",
+    "view_freight_rates",
   ]),
   finance: new Set<PermissionKey>([
     "view_all_trips",
@@ -130,8 +140,10 @@ export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<PermissionKey>> = {
     "verify_documents",
     "edit_rates",
     "export_billing",
+    "view_freight_rates",
+    "import_freight_rates",
   ]),
-  executive_viewer: new Set<PermissionKey>(["view_all_trips"]),
+  executive_viewer: new Set<PermissionKey>(["view_all_trips", "view_freight_rates"]),
 };
 
 /** Pure permission check. Returns false for any unknown role. */
