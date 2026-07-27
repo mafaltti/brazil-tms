@@ -50,6 +50,10 @@ let originId = "";
 let destId = "";
 let reasonLabel = "";
 let billingLabel = "";
+// The suite's REAL option codes — refusal tests must use them so they hit the status/role guards,
+// not INVALID_REASON_CODE (option validation runs first in the service).
+let reasonCodeValue = "";
+let billingCodeValue = "";
 const tripIds: string[] = [];
 const optionIds: string[] = [];
 
@@ -106,14 +110,16 @@ test.beforeAll(async () => {
   const suffix = code("E2E");
   reasonLabel = `Motivo ${suffix}`;
   billingLabel = `Impacto ${suffix}`;
+  reasonCodeValue = code("reason");
+  billingCodeValue = code("billing");
   const reason = await db
     .insert(cancellationOptions)
-    .values({ kind: "reason", code: code("reason"), labelPt: reasonLabel, active: true })
+    .values({ kind: "reason", code: reasonCodeValue, labelPt: reasonLabel, active: true })
     .returning({ id: cancellationOptions.id });
   optionIds.push(reason[0]!.id);
   const billing = await db
     .insert(cancellationOptions)
-    .values({ kind: "billing_impact", code: code("billing"), labelPt: billingLabel, active: true })
+    .values({ kind: "billing_impact", code: billingCodeValue, labelPt: billingLabel, active: true })
     .returning({ id: cancellationOptions.id });
   optionIds.push(billing[0]!.id);
 });
@@ -211,21 +217,23 @@ test.describe("US1 — cancel from Trip Detail", () => {
 
     await apiLogin(request, testAccounts.dispatcher);
     const denied = await request.post(`/api/trips/${id}/cancel`, {
-      data: { reasonCode: "x", responsibleParty: "unknown", billingImpact: "y" },
+      data: {
+        reasonCode: reasonCodeValue,
+        responsibleParty: "unknown",
+        billingImpact: billingCodeValue,
+      },
     });
     expect(denied.status()).toBe(409);
     expect((await denied.json()).error.code).toBe("NOT_CANCELLABLE_BY_ROLE");
 
-    // Unrestricted holder (Ops Manager) cancels the same trip — with the suite's REAL option codes.
+    // Unrestricted holder (Ops Manager) cancels the same trip.
     await apiLogin(request, testAccounts.opsManager);
-    const optionRows = await db
-      .select({ kind: cancellationOptions.kind, code: cancellationOptions.code })
-      .from(cancellationOptions)
-      .where(inArray(cancellationOptions.id, optionIds));
-    const reasonCode = optionRows.find((o) => o.kind === "reason")!.code;
-    const billingCode = optionRows.find((o) => o.kind === "billing_impact")!.code;
     const ok = await request.post(`/api/trips/${id}/cancel`, {
-      data: { reasonCode, responsibleParty: "carrier_caused", billingImpact: billingCode },
+      data: {
+        reasonCode: reasonCodeValue,
+        responsibleParty: "carrier_caused",
+        billingImpact: billingCodeValue,
+      },
     });
     expect(ok.status()).toBe(200);
   });
@@ -255,7 +263,11 @@ test.describe("US1 — cancel from Trip Detail", () => {
 
     await apiLogin(request, testAccounts.opsManager);
     const res = await request.post(`/api/trips/${id}/cancel`, {
-      data: { reasonCode: "x", responsibleParty: "unknown", billingImpact: "y" },
+      data: {
+        reasonCode: reasonCodeValue,
+        responsibleParty: "unknown",
+        billingImpact: billingCodeValue,
+      },
     });
     expect(res.status()).toBe(409);
     expect((await res.json()).error.code).toBe("NOT_CANCELLABLE");

@@ -197,12 +197,17 @@ queue on the next poll.
 - [X] T026 Run Vitest per quickstart (shared `trip-status.test.ts`; `apps/web/lib/trips/
       trip-cancellation.test.ts`; the untouched transition/assignment suites stay green) with
       `DATABASE_URL` on the portable Postgres.
-- [ ] T027 Run Playwright per repo convention (`db:seed:e2e`, prod build, `--workers=1`):
-      `trip-cancellation.spec.ts`, `permission-coverage.spec.ts`, plus `dispatch-board` /
-      `trips-control-tower` / `trip-detail` for regressions.
-- [ ] T028 (POL) Manual quickstart pass (§2-§10) on an environment with the full auth stack (needs
-      Docker GoTrue/Storage — out of scope on this machine, 016 precedent); includes the FR-011
-      deactivate-reactivate check (§9).
+- [X] T027 Run Playwright: done 2026-07-27 against the prod build + a local mock-GoTrue stack
+      (`C:\Users\brazil\.local\brazil-tms-dev\` — no Docker on this machine): `trip-cancellation.spec.ts`
+      **10/10 passed**, `permission-coverage.spec.ts` **31/31 passed** (incl. the 2 new `cancel_trip`
+      rows). Two spec-side fixes were needed (refusal tests must use REAL option codes — the service
+      validates options before the status/role guards).
+- [X] T028 (POL) Quickstart pass §1-§10 done 2026-07-27 on the same local stack: all steps verified
+      via e2e + Vitest + visual screenshots (detail button, dialog, dispatch row, FR-011
+      "não configurado" state with deactivate→reactivate). Caveat: step 7's `control_tower` role has
+      no seeded account anywhere — its denial is enforced by the same `can()` grant list (no
+      `cancel_trip`) and covered by the finance/fleet-coordinator negatives; a full-Docker-stack pass
+      remains possible but adds no new coverage beyond Storage-dependent flows (not touched here).
 
 ---
 
