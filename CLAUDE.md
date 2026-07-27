@@ -67,9 +67,17 @@ Start with two packages (`shared`, `db`); add more only with justification.
 - Code style is enforced by ESLint/Prettier — not by this file. Tests: Vitest + Playwright.
 
 <!-- SPECKIT START -->
-Active feature plan: `specs/015-collapse-validation-statuses/plan.md` (Collapse Validation Statuses into "Recebida").
-For technologies, project structure, BFF/auth patterns, data model, contracts, and setup/test commands,
-read that plan and its `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`.
+Active feature plan: `specs/020-license-expiry-visibility/plan.md` (License/Document Expiry Visibility — issue #27 [0004]).
+**Presentation-only slice**: a coluna "Validade da CNH" nunca mostra a data (`ok` → "—"; expiring/expired → só badge) e
+"sem data" se confunde com "em dia". Dados já chegam ao client (`DriverDto.licenseExpiry`, `documentExpiryState` — janela
+30 dias, calendário São Paulo). Fix: NEW `components/master-data/expiry-cell.tsx` (4 estados: null → "Não informada"
+muted; ok → formatDate; expiring → data + badge "A vencer"; expired → data vermelha + badge "Vencido") usado nas 3
+listas — drivers (licenseExpiry), vehicles + trailers (documentExpiry) — escopo clarificado 2026-07-27. TRAP: NUNCA
+re-derivar o estado na UI — renderizar `documentExpiryState` como entregue (a mesma computação alimenta a elegibilidade
+de atribuição; duas derivações divergem). Sem mudança de DTO/serviço/form/permissão; extensão do motor de alertas (007)
+para vencimentos é OUT OF SCOPE (slice futura).
+
+Previous slice (015) context, still load-bearing:
 This is a **corrective, cross-cutting** change to the trip status machine that **references** shipped slices 003 (status
 machine), 004 (import+validation), 006 (dispatch/assignment), 013 (predefined import template), 014 (auto-validate) — it
 **supersedes 014's born-`validated`** decision and does **not** edit shipped specs; it **amends** `docs/PRD.md`
