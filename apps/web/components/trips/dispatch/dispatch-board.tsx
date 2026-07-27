@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AssignmentForm } from "@/components/trips/dispatch/assignment-form";
-import { useTripBoard } from "@/lib/trips/client";
+import { useFilterOptions, useTripBoard } from "@/lib/trips/client";
 
 /**
  * The Dispatch Board (006 US5, §15.6): the dispatcher's daily workspace — the unassigned-by-pickup
@@ -34,7 +34,13 @@ import { useTripBoard } from "@/lib/trips/client";
 
 const DISPATCH_QUERY = "assigned=false&status=received&sort=pickupStart";
 
-export function DispatchBoard({ resourceOptions }: { resourceOptions: TripFilterOptions }) {
+export function DispatchBoard({
+  resourceOptions: initialResourceOptions,
+}: {
+  resourceOptions: TripFilterOptions;
+}) {
+  // 019 — keep the assign pickers fresh on an open tab (60s poll + focus refetch); server seed.
+  const resourceOptions = useFilterOptions(initialResourceOptions);
   const t = useTranslations("Dispatch");
   const board = useTripBoard(DISPATCH_QUERY);
 

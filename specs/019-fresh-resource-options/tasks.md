@@ -20,30 +20,30 @@ description: "Task list for slice 019 — Fresh Resource Options (no-reload fres
 
 ## Phase 1: Setup
 
-- [ ] T001 Branch `019-fresh-resource-options` off `dev`; baseline lint/typecheck green.
+- [X] T001 Branch `019-fresh-resource-options` off `dev`; baseline lint/typecheck green.
 
 ## Phase 2: Foundational
 
-- [ ] T002 Create `apps/web/app/api/trips/filter-options/route.ts` (GET per plan).
-- [ ] T003 Edit `apps/web/lib/trips/client.ts`: `FILTER_OPTIONS_POLL_MS` + `useFilterOptions(initial)`.
+- [X] T002 Create `apps/web/app/api/trips/filter-options/route.ts` (GET per plan).
+- [X] T003 Edit `apps/web/lib/trips/client.ts`: `FILTER_OPTIONS_POLL_MS` + `useFilterOptions(initial)`.
 
 ## Phase 3: Adoption (US1+US2 — all nine surfaces)
 
-- [ ] T004 Assignment surfaces: `control-tower-table.tsx`, `trip-detail-client.tsx`,
+- [X] T004 Assignment surfaces: `control-tower-table.tsx`, `trip-detail-client.tsx`,
       `dispatch-board.tsx` — swap the static prop for the hook at the top.
-- [ ] T005 Remaining six: the exceptions, reports, sla-rules, billing, rates, and
+- [X] T005 Remaining six: the exceptions, reports, sla-rules, billing, rates, and
       document-requirements client components (resolve exact files; one swap each).
 
 ## Phase 4: e2e
 
-- [ ] T006 Create `apps/web/e2e/fresh-options.spec.ts`: dispatch open → db-insert driver → focus/
+- [X] T006 Create `apps/web/e2e/fresh-options.spec.ts`: dispatch open → db-insert driver → focus/
       visibility-triggered refetch (fallback one interval) → picker offers the driver, no reload;
       first-paint regression (lists immediately present).
 
 ## Phase 5: Polish & gates
 
-- [ ] T007 `pnpm -w lint && pnpm -w typecheck && pnpm -w build`; Vitest workspace green.
-- [ ] T008 Playwright vs the local mock-GoTrue stack: `fresh-options.spec.ts` + regression
+- [X] T007 `pnpm -w lint && pnpm -w typecheck && pnpm -w build`; Vitest workspace green.
+- [X] T008 Playwright vs the local mock-GoTrue stack: `fresh-options.spec.ts` + regression
       (`dispatch-board`, `searchable-pickers` if present on this branch — it is NOT (018 unmerged);
       use `dispatch-assignment` + `trips-control-tower`).
-- [ ] T009 PR to `dev`; CLAUDE.md SPECKIT block → this plan.
+- [X] T009 PR to `dev`; CLAUDE.md SPECKIT block → this plan.

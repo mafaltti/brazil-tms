@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { TripFilterOptions } from "@brazil-tms/db";
-import { useTripDetail } from "@/lib/trips/client";
+import { useFilterOptions, useTripDetail } from "@/lib/trips/client";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TripDetailHeader } from "@/components/trips/trip-detail/header";
@@ -26,11 +26,13 @@ import { PlanEditForm } from "@/components/trips/plan-edit-form";
  */
 export function TripDetailClient({
   id,
-  resourceOptions,
+  resourceOptions: initialResourceOptions,
 }: {
   id: string;
   resourceOptions: TripFilterOptions;
 }) {
+  // 019 — keep the assignment pickers fresh on an open tab (60s poll + focus refetch); server seed.
+  const resourceOptions = useFilterOptions(initialResourceOptions);
   const t = useTranslations("Trips.detail");
   const tCommon = useTranslations("Common");
   const { data, isLoading, isError } = useTripDetail(id);
