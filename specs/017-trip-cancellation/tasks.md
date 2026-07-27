@@ -36,7 +36,7 @@ wires one surface.
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm branch `017-trip-cancellation` (off `dev`) is checked out; start the portable
+- [X] T001 Confirm branch `017-trip-cancellation` (off `dev`) is checked out; start the portable
       Postgres (quickstart §Setup) and capture a baseline `pnpm -w lint && pnpm -w typecheck`
       (expected green pre-change) from the repo root.
 
@@ -49,46 +49,46 @@ dialog — after this phase the API is fully cancellable and every story phase i
 
 **⚠️ CRITICAL**: No user-story work before this phase completes.
 
-- [ ] T002 Edit `packages/shared/src/domain/trip-status.ts`: add
+- [X] T002 Edit `packages/shared/src/domain/trip-status.ts`: add
       `export const DISPATCH_PHASE_TRIP_STATUSES = ["received", "assigned", "confirmed"] as const satisfies readonly TripStatus[];`
       with JSDoc naming the §18 Dispatcher-"Limited" decision (clarification 2026-07-27, spec FR-007).
       `TRIP_STATUSES`/`TRANSITIONS` untouched.
-- [ ] T003 [P] Edit `packages/shared/src/domain/trip-status.test.ts`: membership/shape test for the
+- [X] T003 [P] Edit `packages/shared/src/domain/trip-status.test.ts`: membership/shape test for the
       new constant (⊂ `TRIP_STATUSES`, exact 3 members, all pre-execution).
-- [ ] T004 Edit `packages/db/src/trips/trip-cancellation.ts`: (a) `cancelTrip(tripId, input,
+- [X] T004 Edit `packages/db/src/trips/trip-cancellation.ts`: (a) `cancelTrip(tripId, input,
       actorUserId, opts?: { allowedSourceStatuses?: readonly TripStatus[] })` — after the row load,
       when the list is present and `row.currentStatus` is outside it, throw
       `Conflict("NOT_CANCELLABLE_BY_ROLE", "Seu perfil só pode cancelar viagens na fase de expedição.")`
       (before the `canTransition` check; race-safe via the existing optimistic guarded update);
       (b) add `queryCancellationOptions()` — active rows, ordered `kind, sort_order`, returning
       `{ kind, code, labelPt, sortOrder }`; (c) update the header doc (017 exposure).
-- [ ] T005 [P] Edit `packages/db/seed/trip-domain-sample.ts`: seed `kind='reason'` rows
+- [X] T005 [P] Edit `packages/db/seed/trip-domain-sample.ts`: seed `kind='reason'` rows
       (`cancelled_by_customer` "Cancelado pelo cliente" 1, `no_vehicle_available` "Sem veículo
       disponível" 2, `no_driver_available` "Sem motorista disponível" 3, `weather_road`
       "Clima/estrada" 4, `documentation_issue` "Problema de documentação" 5, `other` "Outro" 6),
       idempotent per `(kind, code)` exactly like the billing block; update the header comment + log
       line ("reason codes seeded with 017 defaults — business sign-off pending", FR-013).
-- [ ] T006 [P] Edit `apps/web/lib/trips/trip-cancellation.ts`: re-export `queryCancellationOptions`
+- [X] T006 [P] Edit `apps/web/lib/trips/trip-cancellation.ts`: re-export `queryCancellationOptions`
       alongside `cancelTrip`.
-- [ ] T007 Create `apps/web/app/api/trips/[id]/cancel/route.ts` (NEW): `POST` — `requireAuth()` +
+- [X] T007 Create `apps/web/app/api/trips/[id]/cancel/route.ts` (NEW): `POST` — `requireAuth()` +
       `requirePermission(ctx, "cancel_trip")`; parse body with `cancelTripSchema` then forward ONLY
       `{reasonCode, responsibleParty, billingImpact}` (trap 3); when `ctx.role === "dispatcher"`
       pass `{ allowedSourceStatuses: DISPATCH_PHASE_TRIP_STATUSES }`; respond `{ item }` (TripDetail);
       `export const dynamic = "force-dynamic"`; JSDoc per contract §1 (error table incl.
       `NOT_CANCELLABLE_BY_ROLE`).
-- [ ] T008 [P] Create `apps/web/app/api/cancellation-options/route.ts` (NEW): `GET` — `requireAuth()`
+- [X] T008 [P] Create `apps/web/app/api/cancellation-options/route.ts` (NEW): `GET` — `requireAuth()`
       + `requirePermission(ctx, "cancel_trip")`; `{ items: await queryCancellationOptions() }`;
       `force-dynamic`; JSDoc per contract §2 (pattern: `app/api/reason-codes/route.ts`, but the
       cancellation table — trap 1).
-- [ ] T009 [P] Edit `apps/web/app/api/trips/[id]/status/route.ts`: before the assignment-phase check,
+- [X] T009 [P] Edit `apps/web/app/api/trips/[id]/status/route.ts`: before the assignment-phase check,
       refuse `input.toStatus === "cancelled"` with `Conflict("USE_CANCELLATION_ENDPOINT",
       "Cancelamento não permitido por esta rota; use o endpoint de cancelamento.")`; extend the route
       JSDoc (the 409 list + why — FR-008); `disputed` untouched (trap 2).
-- [ ] T010 Edit `apps/web/lib/trips/client.ts`: add `useCancellationOptions()` (GET
+- [X] T010 Edit `apps/web/lib/trips/client.ts`: add `useCancellationOptions()` (GET
       `/api/cancellation-options`, config-grade staleness) and `useCancelTrip(tripId)` (POST
       `/api/trips/${id}/cancel`, body `{reasonCode, responsibleParty, billingImpact}`, on success
       invalidate the `["trips"]` root) following the `useAssignTrip`/`useMarkCompleted` pattern.
-- [ ] T011 [P] Edit `apps/web/messages/pt-BR.json`: add the cancel-dialog keys under `Trips` (e.g.
+- [X] T011 [P] Edit `apps/web/messages/pt-BR.json`: add the cancel-dialog keys under `Trips` (e.g.
       `cancelAction` "Cancelar viagem", `cancelTitle`, `cancelReasonLabel` "Motivo",
       `cancelResponsibleLabel` "Parte responsável", `cancelBillingLabel` "Impacto de faturamento",
       `cancelConfirm` "Cancelar viagem", `cancelKeep` "Voltar", `cancelNotConfigured` "Motivos de
@@ -96,13 +96,13 @@ dialog — after this phase the API is fully cancellable and every story phase i
       `customer_caused` "Cliente", `brazil_transports_caused` "Brazil Transports", `carrier_caused`
       "Transportadora", `unknown` "Desconhecida"). `AuditActions.trip_cancel` already exists — do not
       duplicate.
-- [ ] T012 Create `apps/web/components/trips/cancel-trip-dialog.tsx` (NEW): shared shadcn/ui dialog —
+- [X] T012 Create `apps/web/components/trips/cancel-trip-dialog.tsx` (NEW): shared shadcn/ui dialog —
       selects for motivo (options `kind==="reason"`), parte responsável
       (`CANCELLATION_RESPONSIBLE_PARTIES` + T011 labels), impacto (`kind==="billing_impact"`); all
       three required with inline errors (FR-006); `cancelNotConfigured` empty state when a kind has
       no active rows (FR-011); confirm → `useCancelTrip`; surface 409 messages from the BFF; house
       dialog/form patterns (cf. `dispatch/assignment-form.tsx`).
-- [ ] T013 Edit `apps/web/lib/trips/trip-cancellation.test.ts`: new cases — `allowedSourceStatuses:
+- [X] T013 Edit `apps/web/lib/trips/trip-cancellation.test.ts`: new cases — `allowedSourceStatuses:
       DISPATCH_PHASE_TRIP_STATUSES` succeeds on a `received`/`confirmed` trip; throws
       `NOT_CANCELLABLE_BY_ROLE` on an `in_transit` trip (which cancels fine WITHOUT the option);
       `queryCancellationOptions` returns active rows ordered and omits inactive. Existing cases
@@ -121,16 +121,16 @@ justification; timeline + audit show it; unauthorized/ineligible users see no ac
 **Independent Test**: quickstart §2-§3 (ops_manager cancels a `received` trip from detail; missing
 responsible party is rejected inline).
 
-- [ ] T014 [US1] Edit `apps/web/app/(shell)/trips/[id]/page.tsx`: compute `cancelScope` from
+- [X] T014 [US1] Edit `apps/web/app/(shell)/trips/[id]/page.tsx`: compute `cancelScope` from
       `ctx.role` (`admin`/`operations_manager` → `"any"`; `dispatcher` → `"dispatch_phase"`; else
       `"none"`) and pass it to the detail client.
-- [ ] T015 [US1] Edit `apps/web/components/trips/trip-detail/trip-detail-client.tsx`: mount
+- [X] T015 [US1] Edit `apps/web/components/trips/trip-detail/trip-detail-client.tsx`: mount
       `CancelTripDialog` + a header-area "Cancelar viagem" (destructive variant) action; visible iff
       `cancelScope === "any" || (cancelScope === "dispatch_phase" &&
       DISPATCH_PHASE_TRIP_STATUSES.includes(currentStatus))`, AND
       `canTransition(currentStatus, "cancelled")`; on success the detail re-renders from the
       returned/refetched data (badge "Cancelada", SLA cleared, timeline + audit rows visible).
-- [ ] T016 [US1] Create `apps/web/e2e/trip-cancellation.spec.ts` (NEW) — US1 block: ops_manager
+- [X] T016 [US1] Create `apps/web/e2e/trip-cancellation.spec.ts` (NEW) — US1 block: ops_manager
       cancels a `received` trip from detail (badge "Cancelada"; timeline event; audit "Viagem
       cancelada"); submit missing parte responsável → inline error, status unchanged; control_tower
       sees no action and direct `POST /cancel` → 403; dispatcher on an `in_transit` trip sees no
@@ -149,13 +149,13 @@ queue on the next poll.
 
 **Independent Test**: quickstart §4.
 
-- [ ] T017 [US2] Edit `apps/web/app/(shell)/dispatch/page.tsx`: compute `cancelScope` (same mapping
+- [X] T017 [US2] Edit `apps/web/app/(shell)/dispatch/page.tsx`: compute `cancelScope` (same mapping
       as T014) and pass to the board.
-- [ ] T018 [US2] Edit `apps/web/components/trips/dispatch/dispatch-board.tsx`: per-row "Cancelar"
+- [X] T018 [US2] Edit `apps/web/components/trips/dispatch/dispatch-board.tsx`: per-row "Cancelar"
       action beside "Atribuir" opening the shared dialog (queue rows are `received` ⊂ dispatch
       phase, so any `cancelScope !== "none"` shows it); on success the `["trips"]` invalidation
       refreshes the queue; update the board JSDoc.
-- [ ] T019 [US2] Extend `apps/web/e2e/trip-cancellation.spec.ts` — US2 block: dispatcher cancels a
+- [X] T019 [US2] Extend `apps/web/e2e/trip-cancellation.spec.ts` — US2 block: dispatcher cancels a
       queue trip from the row (full dialog flow) → row gone after refetch; a user with
       `assign_resources` but not `cancel_trip` (fleet_coordinator) sees "Atribuir" but no "Cancelar".
 
@@ -169,12 +169,12 @@ queue on the next poll.
 
 **Independent Test**: quickstart §5.
 
-- [ ] T020 [US3] Edit `apps/web/app/(shell)/trips/page.tsx`: compute `cancelScope` (same mapping)
+- [X] T020 [US3] Edit `apps/web/app/(shell)/trips/page.tsx`: compute `cancelScope` (same mapping)
       and pass to the table.
-- [ ] T021 [US3] Edit `apps/web/components/trips/control-tower-table.tsx`: per-row cancel action
+- [X] T021 [US3] Edit `apps/web/components/trips/control-tower-table.tsx`: per-row cancel action
       beside quick-assign opening the shared dialog; visibility = same rule as T015 (per-row status);
       update comments.
-- [ ] T022 [US3] Extend `apps/web/e2e/trip-cancellation.spec.ts` — US3 block: admin cancels from a
+- [X] T022 [US3] Extend `apps/web/e2e/trip-cancellation.spec.ts` — US3 block: admin cancels from a
       list row → row badge "Cancelada" after refetch and excluded from the default active view;
       control_tower sees no row action.
 
@@ -184,17 +184,17 @@ queue on the next poll.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T023 [P] Edit `apps/web/e2e/permission-coverage.spec.ts`: add the `cancel_trip` matrix rows —
+- [X] T023 [P] Edit `apps/web/e2e/permission-coverage.spec.ts`: add the `cancel_trip` matrix rows —
       POST `/cancel` 403 for control_tower/fleet_coordinator/finance; 200/409-domain (never 403) for
       admin/operations_manager/dispatcher — realizing the note at lines 16-17; update that comment to
       point at the dedicated endpoint.
-- [ ] T024 [P] Amend `docs/PRD.md` §30 (decision log): entry dated 2026-07-27 — Dispatcher §18
+- [X] T024 [P] Amend `docs/PRD.md` §30 (decision log): entry dated 2026-07-27 — Dispatcher §18
       "Limited" (Cancel trip) = dispatch-phase source statuses (`received|assigned|confirmed`),
       enforced at the cancellation endpoint; default cancellation-reason seed shipped as labeled
       scaffolding (billing impacts already present), business sign-off pending; `cancelled`
       unreachable via the generic status route (dedicated-endpoint rule).
-- [ ] T025 Run static gates from repo root: `pnpm -w lint && pnpm -w typecheck && pnpm -w build`.
-- [ ] T026 Run Vitest per quickstart (shared `trip-status.test.ts`; `apps/web/lib/trips/
+- [X] T025 Run static gates from repo root: `pnpm -w lint && pnpm -w typecheck && pnpm -w build`.
+- [X] T026 Run Vitest per quickstart (shared `trip-status.test.ts`; `apps/web/lib/trips/
       trip-cancellation.test.ts`; the untouched transition/assignment suites stay green) with
       `DATABASE_URL` on the portable Postgres.
 - [ ] T027 Run Playwright per repo convention (`db:seed:e2e`, prod build, `--workers=1`):

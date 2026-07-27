@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { can } from "@brazil-tms/shared";
 import { verifySession } from "@/lib/auth/session";
+import { cancelScopeForRole } from "@/lib/trips/cancel-scope";
 import { getTripFilterOptions } from "@/lib/trips/trips-read";
 import { TripDetailClient } from "@/components/trips/trip-detail/trip-detail-client";
 
@@ -23,5 +24,7 @@ export default async function TripDetailPage({
 
   const { id } = await params;
   const resourceOptions = await getTripFilterOptions();
-  return <TripDetailClient id={id} resourceOptions={resourceOptions} />;
+  // 017 — reveal the cancel action per §18 (any | dispatch_phase | none); the BFF re-enforces it.
+  const cancelScope = cancelScopeForRole(session.user.role);
+  return <TripDetailClient id={id} resourceOptions={resourceOptions} cancelScope={cancelScope} />;
 }
