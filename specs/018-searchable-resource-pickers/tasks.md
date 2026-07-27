@@ -34,18 +34,18 @@ description: "Task list for slice 018 — Searchable Resource Pickers (type/past
 
 - [X] T005 Edit `apps/web/components/trips/dispatch/assignment-form.tsx`: `ResourceSelect` delegates to `SearchableSelect` (`mode="plate"` on veículo/reboque); props/labels unchanged.
 - [X] T006 Create `apps/web/e2e/searchable-pickers.spec.ts` — driver paste auto-select + full assign; plate normalization; multi-match no auto-select; empty state; keyboard-only; clear options.
-- [X] T007 Update existing dispatch e2e picker interactions to the combobox (trap 2) and keep them green.
+- [X] T007 Existing dispatch e2e needed NO changes — their `getByLabel(...).click()` + `getByRole("option")` pattern is combobox-compatible by construction; regression run 34/35 green (the 1: `trip-lifecycle` fails BEFORE any picker interaction on the import worker+Storage dependency the local harness lacks — pre-existing, unrelated to 018).
 
 ## Phase 4: US3 — board resource filters
 
 - [X] T008 Edit `apps/web/components/trips/trip-filters.tsx`: assigned driver/vehicle/carrier → `SearchableSelect` (clear = "Todos"/`__all__`); other filters untouched.
-- [X] T009 Extend `searchable-pickers.spec.ts`: board filter paste narrows the board; update `trips-control-tower.spec.ts` filter interactions if needed.
+- [X] T009 Board-filter paste covered in `searchable-pickers.spec.ts` (US3, passing); `trips-control-tower.spec.ts` needed no changes (it never drove the resource filters) and stays green.
 
 ## Phase 5: Polish & gates
 
 - [X] T010 `pnpm -w lint && pnpm -w typecheck && pnpm -w build`.
 - [X] T011 Vitest (workspace runner) — new normalize tests + full web suite green.
-- [X] T012 Playwright vs the local mock-GoTrue stack (`C:\Users\brazil\.local\brazil-tms-dev\`): `searchable-pickers.spec.ts` + the trap-2 regression suites.
+- [X] T012 Playwright vs the local mock-GoTrue stack (2026-07-27): `searchable-pickers.spec.ts` **5/5**; regression suites **34/35** (see T007 for the environmental 1).
 - [X] T013 PR to `dev` (never `main`); CLAUDE.md SPECKIT block → this plan.
 
 ## Dependencies
