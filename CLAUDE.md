@@ -67,9 +67,17 @@ Start with two packages (`shared`, `db`); add more only with justification.
 - Code style is enforced by ESLint/Prettier — not by this file. Tests: Vitest + Playwright.
 
 <!-- SPECKIT START -->
-Active feature plan: `specs/015-collapse-validation-statuses/plan.md` (Collapse Validation Statuses into "Recebida").
-For technologies, project structure, BFF/auth patterns, data model, contracts, and setup/test commands,
-read that plan and its `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`.
+Active feature plan: `specs/019-fresh-resource-options/plan.md` (Fresh Resource Options — issue #26 [0003]).
+**Read-path freshness slice**: `getTripFilterOptions()` era carregado 1× server-side em NOVE páginas e passado como
+prop estática — as listas de recursos nunca refazem numa aba aberta (motorista novo "demora 10-15 min" = latência de
+F5 humano). Fix: NEW `GET /api/trips/filter-options` (`view_all_trips` — todos os 7 papéis internos) + hook
+`useFilterOptions(initial)` em `lib/trips/client.ts` (key `["filter-options"]`, `initialData` = seed do servidor,
+`refetchInterval` 60s, focus-refetch default). As 9 páginas MANTÊM o load server-side (seed, FR-003 sem flash) e o
+componente client de topo troca a prop estática pelo hook em UM ponto (filhos inalterados). TRAPS: (1) não remover o
+load server-side nem duplicar fetch no mount (initialData resolve); (2) trocar só no componente de topo; (3) rota nova
+usa APENAS `view_all_trips`. Sem Realtime (constituição: polling), sem mudança de schema/permissão/write-path.
+
+Previous slice (015) context, still load-bearing:
 This is a **corrective, cross-cutting** change to the trip status machine that **references** shipped slices 003 (status
 machine), 004 (import+validation), 006 (dispatch/assignment), 013 (predefined import template), 014 (auto-validate) — it
 **supersedes 014's born-`validated`** decision and does **not** edit shipped specs; it **amends** `docs/PRD.md`
