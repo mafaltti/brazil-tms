@@ -67,9 +67,19 @@ Start with two packages (`shared`, `db`); add more only with justification.
 - Code style is enforced by ESLint/Prettier — not by this file. Tests: Vitest + Playwright.
 
 <!-- SPECKIT START -->
-Active feature plan: `specs/015-collapse-validation-statuses/plan.md` (Collapse Validation Statuses into "Recebida").
-For technologies, project structure, BFF/auth patterns, data model, contracts, and setup/test commands,
-read that plan and its `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`.
+Active feature plan: `specs/018-searchable-resource-pickers/plan.md` (Searchable Resource Pickers — issue #25 [0002]).
+**Presentation-only slice**: the assignment form's 4 resource pickers (motorista/veículo/reboque/transportadora)
+and the Control Tower's 3 resource filters (assigned driver/vehicle/carrier — clarification 2026-07-27) become a
+single shared searchable combobox: NEW `apps/web/components/ui/searchable-select.tsx` (hand-rolled ARIA combobox —
+NO cmdk/popover dependency) + NEW `apps/web/lib/search-normalize.ts` (`normalizeForSearch(text, "text"|"plate")`:
+strip acentos, lowercase, collapse spaces; plate also strips hífen/espaço). Behavior: filter CONTAINS; texto exato
+que casa com UMA opção → auto-seleção (fluxo de colagem, FR-003); "Nenhum resultado"; ↑/↓/Enter/Esc; item de limpar
+fixo ("Sem reboque"/"Sem transportadora"/"Todos"). TRAPS: (1) write path intocável — valores continuam IDs; check de
+elegibilidade/override/assign idênticos (FR-007/SC-003); (2) os e2e existentes de dispatch dirigem o Select antigo e
+devem ser ATUALIZADOS para a interação de combobox e continuar verdes (são a rede de regressão); (3) sentinela
+`__all__` dos filtros = "sem filtro" — o item "Todos" mapeia para ele. Sem mudança de BFF/db/permissão/i18n-namespace.
+
+Previous slice (015) context, still load-bearing:
 This is a **corrective, cross-cutting** change to the trip status machine that **references** shipped slices 003 (status
 machine), 004 (import+validation), 006 (dispatch/assignment), 013 (predefined import template), 014 (auto-validate) — it
 **supersedes 014's born-`validated`** decision and does **not** edit shipped specs; it **amends** `docs/PRD.md`
