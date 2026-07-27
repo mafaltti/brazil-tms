@@ -6,13 +6,8 @@ import type { Finding, TripStatus } from "@brazil-tms/shared";
 import type { TripAssignmentDto, TripFilterOptions } from "@brazil-tms/db";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import type { SearchMode } from "@/lib/search-normalize";
 import {
   Dialog,
   DialogContent,
@@ -39,13 +34,15 @@ import { FindingsList } from "@/components/trips/dispatch/findings-list";
  * `manage_fleet_data`-gated master-data APIs), shows LIVE server-authoritative findings via the
  * dry-run `useAssignmentCheck` endpoint (debounced as resources change), and routes the primary save
  * to assign (status `received`; slice 015, was `validated`) or reassign (`assigned`/`confirmed`).
+ * Since 018 (issue #25) the pickers are SEARCHABLE comboboxes (type/paste to filter; exact-unique
+ * paste auto-selects; plates match hyphen/space/case-insensitively) — the picked value is still a
+ * resource ID and the write path is unchanged.
  * Confirm + Unassign are offered
  * on an `assigned` trip. Conflict authority is server-side: the form disables save on a BLOCK and
  * requires a non-empty override reason whenever a WARN is present (T045) — but the BFF re-enforces
  * both regardless of client state. All text is pt-BR.
  */
 
-const NONE = "__none__";
 const CHECK_DEBOUNCE_MS = 400;
 
 /** Map a `TripsError.code` to a `Dispatch.errors.*` key (falls back to REQUEST_FAILED). */
@@ -248,6 +245,7 @@ export function AssignmentForm({
             placeholder={t("selectVehicle")}
             value={form.vehicleId}
             options={resourceOptions.vehicles}
+            mode="plate"
             onChange={(v) => set("vehicleId", v)}
           />
           <ResourceSelect
@@ -256,6 +254,7 @@ export function AssignmentForm({
             placeholder={t("selectTrailer")}
             value={form.trailerId}
             options={resourceOptions.trailers}
+            mode="plate"
             clearable
             clearLabel={t("noTrailer")}
             onChange={(v) => set("trailerId", v)}
@@ -368,7 +367,11 @@ export function AssignmentForm({
   );
 }
 
-/** A labelled resource `Select`, with an optional "none" clear item for trailer/carrier. */
+/**
+ * A labelled resource picker — since 018 a searchable combobox (type/paste to filter; exact-unique
+ * paste auto-selects; `mode="plate"` for plate fields), with the optional clear item preserved for
+ * trailer/carrier. Same name/props as the old Select wrapper so the form body reads unchanged.
+ */
 function ResourceSelect({
   id,
   label,
@@ -376,6 +379,7 @@ function ResourceSelect({
   value,
   options,
   onChange,
+  mode,
   clearable,
   clearLabel,
 }: {
@@ -385,28 +389,25 @@ function ResourceSelect({
   value: string;
   options: { id: string; label: string }[];
   onChange: (value: string) => void;
+  mode?: SearchMode;
   clearable?: boolean;
   clearLabel?: string;
 }) {
+  const t = useTranslations("Dispatch");
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>{label}</Label>
-      <Select
-        value={value || undefined}
-        onValueChange={(v) => onChange(v === NONE ? "" : v)}
-      >
-        <SelectTrigger id={id}>
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent>
-          {clearable ? <SelectItem value={NONE}>{clearLabel}</SelectItem> : null}
-          {options.map((o) => (
-            <SelectItem key={o.id} value={o.id}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <SearchableSelect
+        id={id}
+        value={value}
+        options={options}
+        onChange={onChange}
+        placeholder={placeholder}
+        emptyText={t("searchNoResults")}
+        mode={mode}
+        clearable={clearable}
+        clearLabel={clearLabel}
+      />
     </div>
   );
 }
