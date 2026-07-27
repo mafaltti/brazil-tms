@@ -784,7 +784,8 @@
   "ExpiryState": {
     "ok": "Em dia",
     "expiring": "A vencer",
-    "expired": "Vencido"
+    "expired": "Vencido",
+    "notInformed": "Não informada"
   },
   "VehicleTypes": {
     "van": "Van",
