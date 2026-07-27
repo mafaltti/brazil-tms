@@ -971,6 +971,39 @@
       "placeholderDocuments": "Documentos da viagem — disponível em uma próxima etapa.",
       "placeholderBilling": "Detalhamento de faturamento — disponível em uma próxima etapa."
     },
+    "cancel": {
+      "action": "Cancelar viagem",
+      "title": "Cancelar viagem",
+      "description": "O cancelamento é definitivo e exige justificativa completa (motivo, parte responsável e impacto de faturamento).",
+      "reasonLabel": "Motivo",
+      "reasonPlaceholder": "Selecione o motivo",
+      "responsibleLabel": "Parte responsável",
+      "responsiblePlaceholder": "Selecione a parte responsável",
+      "billingLabel": "Impacto de faturamento",
+      "billingPlaceholder": "Selecione o impacto",
+      "confirm": "Cancelar viagem",
+      "keep": "Voltar",
+      "submitting": "Cancelando…",
+      "success": "Viagem cancelada.",
+      "requiredField": "Campo obrigatório.",
+      "notConfigured": "Motivos de cancelamento não configurados. Contate um administrador.",
+      "errors": {
+        "NOT_CANCELLABLE": "A viagem não pode ser cancelada neste status.",
+        "NOT_CANCELLABLE_BY_ROLE": "Seu perfil só pode cancelar viagens na fase de expedição.",
+        "STALE_TRANSITION": "A viagem já mudou de status. Atualize a página e tente novamente.",
+        "CANCELLATION_NOT_CONFIGURED": "Motivos de cancelamento não configurados. Contate um administrador.",
+        "INVALID_REASON_CODE": "Motivo de cancelamento inválido.",
+        "INVALID_BILLING_IMPACT": "Impacto de faturamento inválido.",
+        "NOT_FOUND": "Viagem não encontrada.",
+        "REQUEST_FAILED": "Não foi possível cancelar a viagem. Tente novamente."
+      },
+      "responsible": {
+        "customer_caused": "Cliente",
+        "brazil_transports_caused": "Brazil Transports",
+        "carrier_caused": "Transportadora",
+        "unknown": "Desconhecida"
+      }
+    },
     "auditActions": {
       "trip": {
         "create": "Viagem criada",

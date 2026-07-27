@@ -40,6 +40,7 @@ import type {
   DashboardSummary,
   ExceptionListItem,
   ReasonCodeOption,
+  CancellationOptionItem,
   AlertListItem,
   AlertListResult,
   CustomerSlaRuleItem,
@@ -690,6 +691,51 @@ export function useMarkBillingReady(id: string) {
   return useMutation({
     mutationFn: async (input: { waivedRequirements?: WaivedRequirementInput[] } = {}) => {
       const res = await fetch(`/api/trips/${id}/billing-ready`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      return asJson<{ item: TripDetailView }>(res);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: TRIPS_ROOT });
+    },
+  });
+}
+
+// --- Cancellation hooks (017 — issue #24; contracts/trip-cancellation-api.md) --------------------
+
+/** The §19.5 user inputs — the BFF supplies `cancelled_at` itself (server now(), FR-005). */
+export interface CancelTripFormInput {
+  reasonCode: string;
+  responsibleParty: string;
+  billingImpact: string;
+}
+
+/**
+ * Active cancellation options for the cancel dialog (GET /api/cancellation-options) — both kinds
+ * (`reason` | `billing_impact`), config-grade staleness (no polling; refetched on mount/invalidate).
+ * NOT `useReasonCodes` — that hook serves the 007 EXCEPTION reason codes.
+ */
+export function useCancellationOptions(): UseQueryResult<{ items: CancellationOptionItem[] }> {
+  return useQuery({
+    queryKey: [...TRIPS_ROOT, "cancellation-options"],
+    queryFn: async () =>
+      asJson<{ items: CancellationOptionItem[] }>(await fetch(`/api/cancellation-options`)),
+  });
+}
+
+/**
+ * Cancel a trip with full §19.5 justification (POST /api/trips/:id/cancel — the ONLY path to
+ * `cancelled`). 409 codes surface via `TripsError` (NOT_CANCELLABLE, NOT_CANCELLABLE_BY_ROLE,
+ * STALE_TRANSITION, CANCELLATION_NOT_CONFIGURED, …). Invalidates the `["trips"]` root so the
+ * detail, Control Tower list, and dispatch queue all refetch.
+ */
+export function useCancelTrip(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CancelTripFormInput) => {
+      const res = await fetch(`/api/trips/${id}/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),

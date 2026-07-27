@@ -24,8 +24,11 @@ const ASSIGNMENT_PHASE_STATUSES = new Set<string>(["received", "assigned", "conf
  * status machine (`confirmed → at_origin → [loading] → loaded → in_transit → at_destination →
  * [unloading] → unloaded → completed`); each transition appends a `status_change` event and
  * recomputes SLA. Requires `update_trip_status` (first enforcement). Assignment-phase targets are
- * rejected here (see {@link ASSIGNMENT_PHASE_STATUSES}). 409s: USE_ASSIGNMENT_ENDPOINT /
- * ILLEGAL_TRANSITION / STALE_TRANSITION; 404 NOT_FOUND.
+ * rejected here (see {@link ASSIGNMENT_PHASE_STATUSES}), and so is `cancelled` (017 FR-008): a
+ * cancellation demands the §19.5 justification + the `cancel_trip` permission, both enforced ONLY by
+ * POST `/cancel` — before 017 this route let an `update_trip_status` holder cancel with no reason at
+ * all. 409s: USE_ASSIGNMENT_ENDPOINT / USE_CANCELLATION_ENDPOINT / ILLEGAL_TRANSITION /
+ * STALE_TRANSITION; 404 NOT_FOUND.
  */
 export async function POST(
   request: Request,
@@ -40,6 +43,13 @@ export async function POST(
       throw new Conflict(
         "USE_ASSIGNMENT_ENDPOINT",
         "Transição de atribuição não permitida por esta rota; use os endpoints de atribuição/confirmação.",
+      );
+    }
+    // 017 FR-008 — `cancelled` requires the §19.5 justification + `cancel_trip`; only /cancel does that.
+    if (input.toStatus === "cancelled") {
+      throw new Conflict(
+        "USE_CANCELLATION_ENDPOINT",
+        "Cancelamento não permitido por esta rota; use o endpoint de cancelamento.",
       );
     }
     const item = await transitionTripStatus(id, input, ctx.userId);

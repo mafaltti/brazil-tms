@@ -197,6 +197,19 @@ export function isActiveStatus(s: TripStatus): boolean {
 }
 
 /**
+ * The dispatch-phase statuses — before execution starts (017 R2). This names the PRD §18
+ * Dispatcher-"Limited" boundary for **Cancel trip** (clarification 2026-07-27): a Dispatcher may
+ * cancel a trip only while it is in one of these source statuses; Admin/Ops Manager may cancel any
+ * legally cancellable trip. Enforced by `cancelTrip`'s `allowedSourceStatuses` option (409
+ * `NOT_CANCELLABLE_BY_ROLE`) and mirrored by the UI visibility rule (`cancelScope`).
+ */
+export const DISPATCH_PHASE_TRIP_STATUSES = [
+  "received",
+  "assigned",
+  "confirmed",
+] as const satisfies readonly TripStatus[];
+
+/**
  * Map a billing-status FILTER value onto the concrete `current_status` values to match (005 R3). There
  * is no stored `billing_status` column, so a board filter of `billing_pending` resolves to the single
  * matching status. Each billing-phase value projects to itself; `null` (no filter / non-billing) →
