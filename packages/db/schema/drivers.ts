@@ -8,6 +8,10 @@ import { ownershipType, resourceStatus } from "./enums";
  * enforces the invariant `subcontracted ⇒ carrier_id set` / `owned ⇒ carrier_id null`. `status` is
  * the operational `resource_status` (R3), orthogonal to `archived_at`. `license_expiry` feeds the
  * derived documentation-expiry warning (R9, computed in the service, never stored).
+ *
+ * `email` is DORMANT (issue #28 [0005] replaced it with `cpf` across the product surface): the
+ * column must stay mapped here — removing it makes the next `drizzle-kit generate` emit a
+ * data-destroying DROP COLUMN — but nothing reads or writes it anymore.
  */
 export const drivers = pgTable(
   "drivers",
@@ -15,7 +19,8 @@ export const drivers = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     phone: text("phone"),
-    email: text("email"),
+    email: text("email"), // dormant — see the table doc comment
+    cpf: text("cpf"),
     licenseNumber: text("license_number"),
     licenseCategory: text("license_category"),
     licenseExpiry: date("license_expiry"),

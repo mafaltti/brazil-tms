@@ -495,7 +495,7 @@ MVP computes SLA status from the planned pickup window, planned delivery window,
 | ID | Requirement | Priority |
 |---|---|---|
 | RES-001 | Users can create and edit driver records. | MVP |
-| RES-002 | Driver records include name, phone, license category, document expiry dates, carrier/employer, status, and notes. | MVP |
+| RES-002 | Driver records include name, phone, CPF, license category, document expiry dates, carrier/employer, status, and notes. | MVP |
 | RES-003 | Users can create and edit vehicle records. | MVP |
 | RES-004 | Vehicle records include plate, type, capacity, owner/carrier, document expiry dates, tracker identifier if available, and status. | MVP |
 | RES-005 | Users can create and edit trailer records where applicable. | MVP |
@@ -700,7 +700,7 @@ Fields:
 - Driver ID.
 - Name.
 - Phone.
-- Email if available.
+- CPF if available.
 - License number.
 - License category.
 - License expiration date.
@@ -1637,3 +1637,4 @@ Decisions made to bring this PRD to execution-readiness. Override any of these i
 - **Localization** (21.6): i18n from day one; MVP UI in pt-BR.
 - **SLA milestone data**: MVP SLA computed from pickup/delivery windows + assignment/confirmation cutoffs; per-milestone planned times deferred to Input #2.
 - **Collapse validation statuses** (slice 015, 2026-06-07): the three early validation states — `Received`, `Validation Error`, `Validated` — are collapsed into a single `Received`, which becomes the first **dispatchable** status (§12, §12.1). Import already validates every row (only Valid/Warning rows are applied), so a separate trip-level validate hop carried no information. The active status machine drops from 18 to 16 values; `Assigned`/`Confirmed` and everything from `Confirmed` onward are unchanged (the confirm step and the confirmation-cutoff SLA are out of scope). This **supersedes slice 014's born-`Validated`** decision: imported trips are now born `Received`, and assign/unassign run `Received → Assigned` / `Assigned → Received`. The `trip_status` DB enum keeps all 18 physical members (Postgres has no `DROP VALUE`); the two removed values become **dormant** (retained only for immutable `trip_events` history) and a one-time data migration backfills any live trip off them. The separate `import_batch_status` enum (which also has `validated`) is untouched.
+- **Driver CPF replaces e-mail** (slice 022, issue #28, 2026-07-28): the driver record captures **CPF** (optional, 11 digits, format check only — same posture as CNPJ) instead of e-mail, which the operation never used. The DB `email` column becomes **dormant** (kept with its data for history; no product surface reads it); a future cleanup migration may drop it once the business confirms. CPF uniqueness/check-digit validation deferred until the business asks.

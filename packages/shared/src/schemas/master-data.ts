@@ -77,6 +77,15 @@ export const cnpjSchema = z
 
 const optionalCnpj = blankable(cnpjSchema);
 
+/** CPF — basic format check only (same posture as CNPJ/R7): 11 digits after stripping punctuation. */
+export const cpfSchema = z
+  .string()
+  .trim()
+  .transform((s) => s.replace(/\D/g, ""))
+  .pipe(z.string().length(11, "CPF deve ter 11 dígitos."));
+
+const optionalCpf = blankable(cpfSchema);
+
 /** BR/Mercosul plate (R11): normalized to uppercase, hyphen/space stripped. */
 export const plateSchema = z
   .string()
@@ -300,7 +309,8 @@ export type UpdateLaneInput = z.infer<typeof updateLaneSchema>;
 const driverBase = z.object({
   name: nameSchema,
   phone: optionalText(40),
-  email: optionalEmail,
+  // Issue #28 [0005]: CPF replaced the driver e-mail; the DB `email` column is dormant.
+  cpf: optionalCpf,
   licenseNumber: optionalText(40),
   licenseCategory: optionalText(8),
   licenseExpiry: optionalDate,

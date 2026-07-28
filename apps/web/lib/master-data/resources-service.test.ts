@@ -84,6 +84,21 @@ describe.skipIf(!hasDb)("resources-service (integration)", () => {
     expect(audits).toHaveLength(1);
   });
 
+  it("driver CPF round-trips on create/update and clears with null (issue #28)", async () => {
+    const dto = await createDriver(
+      { name: "Motorista CPF", ownershipType: "owned", cpf: "39053344705" },
+      actorId,
+    );
+    driverIds.push(dto.id);
+    expect(dto.cpf).toBe("39053344705");
+
+    const updated = await updateDriver(dto.id, { cpf: "52998224725" }, actorId);
+    expect(updated.cpf).toBe("52998224725");
+
+    const cleared = await updateDriver(dto.id, { cpf: null }, actorId);
+    expect(cleared.cpf).toBeNull();
+  });
+
   it("createVehicle (owned) emits vehicle.create; createTrailer (owned) emits trailer.create", async () => {
     const v = await createVehicle(
       { plate: plate(), vehicleType: "truck", ownershipType: "owned" },

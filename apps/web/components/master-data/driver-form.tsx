@@ -45,7 +45,7 @@ export function DriverForm({
     defaultValues: {
       name: "",
       phone: "",
-      email: "",
+      cpf: "",
       licenseNumber: "",
       licenseCategory: "",
       licenseExpiry: "",
@@ -76,8 +76,8 @@ export function DriverForm({
         <Field label={t("phone")} htmlFor="phone" error={fieldMessage(errors.phone)}>
           <Input id="phone" {...register("phone")} />
         </Field>
-        <Field label={t("email")} htmlFor="email" error={fieldMessage(errors.email)}>
-          <Input id="email" type="email" {...register("email")} />
+        <Field label={t("cpf")} htmlFor="cpf" error={fieldMessage(errors.cpf)}>
+          <Input id="cpf" inputMode="numeric" placeholder="000.000.000-00" {...register("cpf")} />
         </Field>
       </div>
 

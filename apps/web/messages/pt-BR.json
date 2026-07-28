@@ -706,7 +706,7 @@
       "searchPlaceholder": "Buscar por nome ou telefone",
       "name": "Nome",
       "phone": "Telefone",
-      "email": "E-mail",
+      "cpf": "CPF",
       "licenseNumber": "CNH",
       "licenseCategory": "Categoria",
       "licenseExpiry": "Validade da CNH",
