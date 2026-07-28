@@ -91,6 +91,9 @@ export function VehicleDetailClient({ vehicleId, canArchive }: Props) {
     ? {
         plate: current.plate,
         vehicleType: current.vehicleType,
+        anttNumber: current.anttNumber ?? "",
+        renavam: current.renavam ?? "",
+        chassis: current.chassis ?? "",
         capacityKg: current.capacityKg ?? undefined,
         ownershipType: current.ownershipType,
         carrierId: current.carrierId ?? "",

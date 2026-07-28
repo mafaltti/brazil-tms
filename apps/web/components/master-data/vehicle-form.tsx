@@ -51,6 +51,9 @@ export function VehicleForm({
     defaultValues: {
       plate: "",
       vehicleType: undefined,
+      anttNumber: "",
+      renavam: "",
+      chassis: "",
       capacityKg: undefined,
       ownershipType: "owned",
       carrierId: "",
@@ -74,6 +77,8 @@ export function VehicleForm({
       onCancel={onCancel}
       onSubmit={handleSubmit((values) => onSubmit(values))}
     >
+      {/* Issue #30 [0007]: the registry identifiers sit together (Placa/Tipo/Renavam/ANTT) and
+          Capacidade shares a half-width row with Chassi instead of spanning the form. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t("plate")} htmlFor="plate" required error={fieldMessage(errors.plate)}>
           <Input id="plate" {...register("plate")} />
@@ -87,11 +92,19 @@ export function VehicleForm({
           required
           error={fieldMessage(errors.vehicleType)}
         />
+        <Field label={t("renavam")} htmlFor="renavam" error={fieldMessage(errors.renavam)}>
+          <Input id="renavam" inputMode="numeric" {...register("renavam")} />
+        </Field>
+        <Field label={t("anttNumber")} htmlFor="anttNumber" error={fieldMessage(errors.anttNumber)}>
+          <Input id="anttNumber" {...register("anttNumber")} />
+        </Field>
+        <Field label={t("chassis")} htmlFor="chassis" error={fieldMessage(errors.chassis)}>
+          <Input id="chassis" {...register("chassis")} />
+        </Field>
+        <Field label={t("capacityKg")} htmlFor="capacityKg" error={fieldMessage(errors.capacityKg)}>
+          <Input id="capacityKg" type="number" min={0} {...register("capacityKg")} />
+        </Field>
       </div>
-
-      <Field label={t("capacityKg")} htmlFor="capacityKg" error={fieldMessage(errors.capacityKg)}>
-        <Input id="capacityKg" type="number" min={0} {...register("capacityKg")} />
-      </Field>
 
       <OwnershipCarrierFields
         control={control}

@@ -8,6 +8,8 @@ import { ownershipType, resourceStatus, vehicleType } from "./enums";
  * Zod-validated). `vehicle_type` is the fixed code enum (R6). Ownership/carrier CHECK mirrors
  * drivers (R4). `owner` is the owned-case lease/finance party; `tracker_*` capture the telemetry
  * provider. `document_expiry` feeds the derived expiry warning (R9). `status` is `resource_status`.
+ * `antt_number`/`renavam`/`chassis` are the Brazilian registry identifiers (issue #30 [0007]) —
+ * optional, non-unique (the plate stays the only unique key).
  */
 export const vehicles = pgTable(
   "vehicles",
@@ -15,6 +17,9 @@ export const vehicles = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     plate: text("plate").notNull().unique(),
     vehicleType: vehicleType("vehicle_type").notNull(),
+    anttNumber: text("antt_number"),
+    renavam: text("renavam"),
+    chassis: text("chassis"),
     capacityKg: integer("capacity_kg"),
     ownershipType: ownershipType("ownership_type").notNull(),
     carrierId: uuid("carrier_id").references(() => carriers.id),

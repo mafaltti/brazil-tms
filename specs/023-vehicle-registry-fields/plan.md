@@ -46,7 +46,7 @@ apps/web/components/master-data/vehicle-form.tsx  # EDIT — + 3 fields; rows: P
                                              #   Renavam|ANTT, Chassi|Capacidade (half-width)
 apps/web/components/master-data/vehicle-detail-client.tsx # EDIT — defaultValues + 3 fields
 apps/web/messages/pt-BR.json                 # EDIT — Resources.vehicles: anttNumber/renavam/chassis
-docs/PRD.md                                  # EDIT — §14 Vehicle field list; RES-003; §30 decision
+docs/PRD.md                                  # EDIT — §14 Vehicle field list; RES-004; §30 decision
 
 packages/shared/src/schemas/master-data.test.ts    # EDIT — renavam/chassi cases
 apps/web/lib/master-data/resources-service.test.ts # EDIT — vehicle registry-fields round-trip

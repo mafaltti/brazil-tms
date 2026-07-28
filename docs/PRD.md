@@ -497,7 +497,7 @@ MVP computes SLA status from the planned pickup window, planned delivery window,
 | RES-001 | Users can create and edit driver records. | MVP |
 | RES-002 | Driver records include name, phone, license category, document expiry dates, carrier/employer, status, and notes. | MVP |
 | RES-003 | Users can create and edit vehicle records. | MVP |
-| RES-004 | Vehicle records include plate, type, capacity, owner/carrier, document expiry dates, tracker identifier if available, and status. | MVP |
+| RES-004 | Vehicle records include plate, type, ANTT/Renavam/chassis if available, capacity, owner/carrier, document expiry dates, tracker identifier if available, and status. | MVP |
 | RES-005 | Users can create and edit trailer records where applicable. | MVP |
 | RES-006 | Users can create and edit carrier/subcontractor records. | MVP |
 | RES-007 | System tracks resource active, inactive, unavailable, maintenance, and blocked statuses. | MVP |
@@ -715,6 +715,9 @@ Fields:
 - Vehicle ID.
 - Plate.
 - Vehicle type.
+- ANTT (RNTRC) number if available.
+- Renavam if available.
+- Chassis (VIN) if available.
 - Capacity.
 - Owner.
 - Carrier.
@@ -1637,3 +1640,4 @@ Decisions made to bring this PRD to execution-readiness. Override any of these i
 - **Localization** (21.6): i18n from day one; MVP UI in pt-BR.
 - **SLA milestone data**: MVP SLA computed from pickup/delivery windows + assignment/confirmation cutoffs; per-milestone planned times deferred to Input #2.
 - **Collapse validation statuses** (slice 015, 2026-06-07): the three early validation states — `Received`, `Validation Error`, `Validated` — are collapsed into a single `Received`, which becomes the first **dispatchable** status (§12, §12.1). Import already validates every row (only Valid/Warning rows are applied), so a separate trip-level validate hop carried no information. The active status machine drops from 18 to 16 values; `Assigned`/`Confirmed` and everything from `Confirmed` onward are unchanged (the confirm step and the confirmation-cutoff SLA are out of scope). This **supersedes slice 014's born-`Validated`** decision: imported trips are now born `Received`, and assign/unassign run `Received → Assigned` / `Assigned → Received`. The `trip_status` DB enum keeps all 18 physical members (Postgres has no `DROP VALUE`); the two removed values become **dormant** (retained only for immutable `trip_events` history) and a one-time data migration backfills any live trip off them. The separate `import_batch_status` enum (which also has `validated`) is untouched.
+- **Vehicle registry identifiers** (slice 023, issue #30, 2026-07-28): vehicle records capture **ANTT (RNTRC)**, **Renavam** and **Chassis (VIN)** — optional, non-unique (the plate stays the only unique key). Validation matches each format's certainty (the R7 posture): Renavam = 9–11 digits after stripping punctuation; chassis = 17 standard-VIN characters normalized uppercase; ANTT stays free text (its format varies by era/category). The vehicle form groups Placa/Tipo/Renavam/ANTT and shrinks Capacidade to a half-width cell (the issue's space request). Trailers (which legally also carry these identifiers) are deferred until the business asks.

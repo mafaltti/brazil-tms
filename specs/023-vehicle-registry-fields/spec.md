@@ -62,7 +62,7 @@ The form's top block reads Placa | Tipo, then Renavam | ANTT — the four regist
 - **FR-002**: Renavam MUST accept punctuated or bare input, normalize to digits, and require 9–11 digits; Chassi MUST normalize (uppercase, strip spaces/hyphens) and require exactly 17 standard-VIN characters (no I/O/Q); ANTT is free text ≤ 20. All three: blank clears, absent leaves unchanged.
 - **FR-003**: Stored values MUST round-trip: list/detail DTOs deliver them and the edit form re-displays them.
 - **FR-004**: The form layout MUST group Placa, Tipo, Renavam and ANTT (paired rows) and place Capacidade beside Chassi at half width — no full-width Capacidade.
-- **FR-005**: PRD conceptual model (§14 Vehicle) and RES-003 amended; §30 records the decision. Shipped specs (002) are NOT edited.
+- **FR-005**: PRD conceptual model (§14 Vehicle) and RES-004 amended; §30 records the decision. Shipped specs (002) are NOT edited.
 
 ### Key Entities
 

@@ -24,6 +24,10 @@ export interface VehicleDto {
   id: string;
   plate: string;
   vehicleType: VehicleType;
+  /** Brazilian registry identifiers (issue #30 [0007]) — optional, non-unique. */
+  anttNumber: string | null;
+  renavam: string | null;
+  chassis: string | null;
   capacityKg: number | null;
   ownershipType: OwnershipType;
   carrierId: string | null;
@@ -45,6 +49,9 @@ interface VehicleRow {
   id: string;
   plate: string;
   vehicleType: VehicleType;
+  anttNumber: string | null;
+  renavam: string | null;
+  chassis: string | null;
   capacityKg: number | null;
   ownershipType: OwnershipType;
   carrierId: string | null;
@@ -64,6 +71,9 @@ function toDto(row: VehicleRow): VehicleDto {
     id: row.id,
     plate: row.plate,
     vehicleType: row.vehicleType,
+    anttNumber: row.anttNumber,
+    renavam: row.renavam,
+    chassis: row.chassis,
     capacityKg: row.capacityKg,
     ownershipType: row.ownershipType,
     carrierId: row.carrierId,
@@ -171,6 +181,9 @@ export async function createVehicle(
         .values({
           plate: input.plate,
           vehicleType: input.vehicleType,
+          anttNumber: input.anttNumber ?? null,
+          renavam: input.renavam ?? null,
+          chassis: input.chassis ?? null,
           capacityKg: input.capacityKg ?? null,
           ownershipType: input.ownershipType,
           carrierId: input.carrierId ?? null,
@@ -216,6 +229,9 @@ export async function updateVehicle(
   const fields: string[] = [
     "plate",
     "vehicleType",
+    "anttNumber",
+    "renavam",
+    "chassis",
     "capacityKg",
     "ownershipType",
     "carrierId",

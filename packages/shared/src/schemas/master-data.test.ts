@@ -13,6 +13,7 @@ import {
   ufSchema,
   updateCustomerSchema,
   updateDriverSchema,
+  updateVehicleSchema,
 } from "./master-data";
 
 const UUID_A = "11111111-1111-1111-1111-111111111111";
@@ -138,6 +139,60 @@ describe("ownership/carrier invariant (US3/US4)", () => {
     expect(createDriverSchema.safeParse({ name: "João", ownershipType: "owned" }).success).toBe(
       true,
     );
+  });
+
+  it("vehicle: Renavam strips punctuation (9–11 digits); chassi normalizes to VIN-17; ANTT free text (issue #30)", () => {
+    const ok = createVehicleSchema.safeParse({
+      plate: "ABC1D23",
+      vehicleType: "truck",
+      ownershipType: "owned",
+      renavam: "1234.567.890-1",
+      chassis: "9bwzzz377 vt-004251",
+      anttNumber: "12345678",
+    });
+    expect(ok.success).toBe(true);
+    if (ok.success) {
+      expect(ok.data.renavam).toBe("12345678901");
+      expect(ok.data.chassis).toBe("9BWZZZ377VT004251");
+      expect(ok.data.anttNumber).toBe("12345678");
+    }
+
+    const base = { plate: "ABC1D23", vehicleType: "truck", ownershipType: "owned" };
+    // Renavam: legacy 9 digits pass; 8 digits fail.
+    expect(createVehicleSchema.safeParse({ ...base, renavam: "123456789" }).success).toBe(true);
+    expect(createVehicleSchema.safeParse({ ...base, renavam: "12345678" }).success).toBe(false);
+    // Regression: stray letters/symbols must FAIL, never be silently stripped into a valid value.
+    expect(
+      createVehicleSchema.safeParse({ ...base, renavam: "abc1234.567.890-1xyz" }).success,
+    ).toBe(false);
+    // Upper bound (AC3): 12 digits fail with the pt-BR message.
+    const tooLong = createVehicleSchema.safeParse({ ...base, renavam: "123456789012" });
+    expect(tooLong.success).toBe(false);
+    if (!tooLong.success) {
+      expect(tooLong.error.issues[0]?.message).toBe("Renavam deve ter de 9 a 11 dígitos.");
+    }
+    // ANTT: free text capped at 20 chars (FR-002).
+    expect(createVehicleSchema.safeParse({ ...base, anttNumber: "a".repeat(20) }).success).toBe(
+      true,
+    );
+    expect(createVehicleSchema.safeParse({ ...base, anttNumber: "a".repeat(21) }).success).toBe(
+      false,
+    );
+    // Chassi: wrong length and the excluded letters I/O/Q fail.
+    expect(createVehicleSchema.safeParse({ ...base, chassis: "9BWZZZ377VT00425" }).success).toBe(
+      false,
+    );
+    expect(
+      createVehicleSchema.safeParse({ ...base, chassis: "IBWZZZ377VT004251" }).success,
+    ).toBe(false);
+
+    // Blank clears; absent stays omitted (the blankable update contract).
+    const cleared = updateVehicleSchema.parse({ renavam: "", chassis: "", anttNumber: "" });
+    expect(cleared.renavam).toBeNull();
+    expect(cleared.chassis).toBeNull();
+    expect(cleared.anttNumber).toBeNull();
+    const absent = updateVehicleSchema.parse({ capacityKg: 1000 });
+    expect("renavam" in absent).toBe(false);
   });
 
   it("vehicle: plate + vehicleType + ownershipType required; status enum enforced", () => {

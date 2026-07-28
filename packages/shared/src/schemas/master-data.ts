@@ -77,6 +77,33 @@ export const cnpjSchema = z
 
 const optionalCnpj = blankable(cnpjSchema);
 
+/**
+ * Renavam — basic format check only (R7 posture): digits after stripping punctuation, 9–11
+ * (11 modern, 9 legacy pre-2013 registrations; no check-digit validation until asked).
+ */
+export const renavamSchema = z
+  .string()
+  .trim()
+  // Strip only the supported separators — anything else (letters, stray symbols) must FAIL the
+  // digit check below, never be silently discarded.
+  .transform((s) => s.replace(/[.\-\s]/g, ""))
+  .pipe(z.string().regex(/^\d{9,11}$/, "Renavam deve ter de 9 a 11 dígitos."));
+
+const optionalRenavam = blankable(renavamSchema);
+
+/** Chassi (VIN) — normalized uppercase, space/hyphen stripped; 17 standard chars (no I/O/Q). */
+export const chassisSchema = z
+  .string()
+  .trim()
+  .transform((s) => s.toUpperCase().replace(/[\s-]/g, ""))
+  .pipe(
+    z
+      .string()
+      .regex(/^[A-HJ-NPR-Z0-9]{17}$/, "Chassi inválido (17 caracteres, sem I, O ou Q)."),
+  );
+
+const optionalChassis = blankable(chassisSchema);
+
 /** BR/Mercosul plate (R11): normalized to uppercase, hyphen/space stripped. */
 export const plateSchema = z
   .string()
@@ -324,6 +351,11 @@ export type UpdateDriverInput = z.infer<typeof updateDriverSchema>;
 const vehicleBase = z.object({
   plate: plateSchema,
   vehicleType: vehicleTypeSchema,
+  // Issue #30 [0007]: Brazilian registry identifiers. ANTT (RNTRC) stays free text — its format
+  // varies by era/category — while Renavam and Chassi have well-defined shapes.
+  anttNumber: optionalText(20),
+  renavam: optionalRenavam,
+  chassis: optionalChassis,
   capacityKg: numberFromInput(z.number().int().nonnegative()),
   ownershipType: ownershipTypeSchema,
   carrierId: carrierIdField,

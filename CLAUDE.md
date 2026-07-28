@@ -76,7 +76,7 @@ espaço/hífen → exatamente 17 chars VIN `[A-HJ-NPR-Z0-9]`, sem I/O/Q), ANTT =
 segundo regenera/renumera a sua no passo de conflitos — NÃO "consertar" antes do merge). Serviço: DTO/insert/update
 field-list + 3 campos (audit genérico). UI `vehicle-form.tsx` — LAYOUT da issue: linhas Placa|Tipo, Renavam|ANTT,
 Chassi|Capacidade (Capacidade deixa de ser full-width) + `vehicle-detail-client.tsx` + `Resources.vehicles.{anttNumber,
-renavam,chassis}` no pt-BR. PRD emendado (§14 Vehicle, RES-003, §30). Fora de escopo: reboques (têm Renavam/Chassi mas a
+renavam,chassis}` no pt-BR. PRD emendado (§14 Vehicle, RES-004, §30). Fora de escopo: reboques (têm Renavam/Chassi mas a
 issue nomeia veículos), colunas na lista, unicidade, dígitos verificadores, prefill via leitor de CRLV (021 — follow-up).
 
 Previous slice (015) context:
