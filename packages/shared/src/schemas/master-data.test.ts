@@ -153,6 +153,16 @@ describe("ownership/carrier invariant (US3/US4)", () => {
       createDriverSchema.safeParse({ name: "João", ownershipType: "owned", cpf: "12345" }).success,
     ).toBe(false);
 
+    // Regression (Codex review, 2026-07-28): stray letters/symbols around an otherwise-valid CPF
+    // must FAIL — only supported separators (dot/hyphen/space) are stripped, never \D wholesale.
+    expect(
+      createDriverSchema.safeParse({
+        name: "João",
+        ownershipType: "owned",
+        cpf: "abc390.533.447-05xyz",
+      }).success,
+    ).toBe(false);
+
     const cleared = updateDriverSchema.parse({ cpf: "" });
     expect(cleared.cpf).toBeNull();
     const absent = updateDriverSchema.parse({ name: "João" });

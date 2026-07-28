@@ -77,12 +77,17 @@ export const cnpjSchema = z
 
 const optionalCnpj = blankable(cnpjSchema);
 
-/** CPF — basic format check only (same posture as CNPJ/R7): 11 digits after stripping punctuation. */
+/**
+ * CPF — punctuated ("390.533.447-05") or bare digits only (FR-002). Strips ONLY the supported
+ * separators (dot/hyphen/space); any other character must FAIL the digit check below, never be
+ * silently discarded ("abc390.533.447-05xyz" is rejected, not coerced). Format check only — no
+ * check digits (R7 posture).
+ */
 export const cpfSchema = z
   .string()
   .trim()
-  .transform((s) => s.replace(/\D/g, ""))
-  .pipe(z.string().length(11, "CPF deve ter 11 dígitos."));
+  .transform((s) => s.replace(/[.\-\s]/g, ""))
+  .pipe(z.string().regex(/^\d{11}$/, "CPF deve ter 11 dígitos."));
 
 const optionalCpf = blankable(cpfSchema);
 
