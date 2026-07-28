@@ -67,7 +67,19 @@ Start with two packages (`shared`, `db`); add more only with justification.
 - Code style is enforced by ESLint/Prettier — not by this file. Tests: Vitest + Playwright.
 
 <!-- SPECKIT START -->
-Active feature plan: `specs/015-collapse-validation-statuses/plan.md` (Collapse Validation Statuses into "Recebida").
+Active feature plan: `specs/024-larger-resource-dialogs/plan.md` (Larger Resource Registration Dialogs — issue #31 [0008]).
+**Presentation-only slice** (padrão da 020): os diálogos de criação de Motorista/Veículo/Reboque saem do `max-w-lg`
+base (512px) para **`max-w-4xl` (896px) + `max-h-[90vh]`**, via `className` nos três `DialogContent` de
+`drivers-client.tsx` / `vehicles-client.tsx` / `trailers-client.tsx` (o `cn()` usa tailwind-merge, então o `max-w-*`
+passado sobrescreve o base limpo). TRAPS: (1) NÃO tocar `ui/dialog.tsx` — alargaria TODOS os diálogos do app;
+(2) NÃO tocar os forms — `driver-form.tsx` é do PR #39 [022] e `vehicle-form.tsx` do PR #40 [023]; mexer aqui cria
+conflito desnecessário entre PRs (por isso os pares de campos NÃO são re-agrupados — isso foi a 0007). Outros diálogos
+de master-data (customers/carriers/locations/lanes) e páginas de edição ficam como estão (issue nomeia só os três).
+e2e novo `dialog-size.spec.ts` mede boundingBox ≥ 850px no viewport 1280. Redesign com abas/3 colunas do sistema de
+referência = futuro, se o negócio pedir.
+
+Previous slice (015) context:
+Collapse Validation Statuses into "Recebida".
 For technologies, project structure, BFF/auth patterns, data model, contracts, and setup/test commands,
 read that plan and its `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`.
 This is a **corrective, cross-cutting** change to the trip status machine that **references** shipped slices 003 (status
