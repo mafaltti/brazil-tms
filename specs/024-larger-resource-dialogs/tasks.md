@@ -15,8 +15,8 @@ creates avoidable cross-PR conflicts). Only the three `*s-client.tsx` `DialogCon
 
 ## Tasks
 
-- [ ] T001 Branch `024-larger-resource-dialogs` off `dev` (worktree); baseline gates green.
-- [ ] T002 `drivers-client.tsx` + `vehicles-client.tsx` + `trailers-client.tsx`: DialogContent → `max-h-[90vh] max-w-4xl overflow-y-auto`.
-- [ ] T003 New `apps/web/e2e/dialog-size.spec.ts`: the three dialogs ≥ 850px wide at the 1280px viewport; still functional (fill + cancel/create).
-- [ ] T004 Gates: lint/typecheck/build; Playwright (new spec + `master-data-resources.spec.ts` regression); visual screenshot check.
-- [ ] T005 PR to `dev`; CLAUDE.md SPECKIT block → this plan.
+- [X] T001 Branch `024-larger-resource-dialogs` off `dev` (worktree); baseline gates green.
+- [X] T002 `drivers-client.tsx` + `vehicles-client.tsx` + `trailers-client.tsx`: DialogContent → `max-h-[90vh] max-w-4xl overflow-y-auto`.
+- [X] T003 New `apps/web/e2e/dialog-size.spec.ts`: the three dialogs measure ~896px at the 1280px viewport (≥ 800 floor, below the enter-animation frame) + customers stays base-width; functional coverage stays in `master-data-resources.spec.ts`.
+- [X] T004 Gates: lint/typecheck/build; Playwright (new spec + `master-data-resources.spec.ts` regression); visual screenshot check.
+- [X] T005 PR to `dev`; CLAUDE.md SPECKIT block → this plan.

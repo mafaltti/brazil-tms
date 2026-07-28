@@ -151,7 +151,8 @@ export function VehiclesClient({ canArchive }: { canArchive: boolean }) {
       />
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
+        {/* Issue #31 [0008]: larger registration window than the base max-w-lg. */}
+        <DialogContent className="max-h-[90vh] w-[calc(100%-2rem)] max-w-4xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t("create")}</DialogTitle>
             <DialogDescription>{t("subtitle")}</DialogDescription>

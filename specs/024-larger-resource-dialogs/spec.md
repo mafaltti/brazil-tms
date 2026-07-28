@@ -50,7 +50,7 @@ None — presentation only.
 
 ### Measurable Outcomes
 
-- **SC-001**: The three resource create dialogs measure ≥ 850px wide at a 1280px desktop viewport (today: 512px) — resolving issue #31.
+- **SC-001**: The three resource create dialogs measure ~896px wide at a 1280px desktop viewport (today: 512px; e2e floor 800px, below the enter-animation frame) — resolving issue #31.
 - **SC-002**: All existing resource e2e flows keep passing inside the larger dialogs.
 
 ## Assumptions
