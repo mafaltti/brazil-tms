@@ -24,7 +24,8 @@ export interface DriverDto {
   id: string;
   name: string;
   phone: string | null;
-  email: string | null;
+  /** Issue #28 [0005]: CPF replaced the driver e-mail (the DB `email` column is dormant). */
+  cpf: string | null;
   licenseNumber: string | null;
   licenseCategory: string | null;
   licenseExpiry: string | null;
@@ -45,7 +46,7 @@ interface DriverRow {
   id: string;
   name: string;
   phone: string | null;
-  email: string | null;
+  cpf: string | null;
   licenseNumber: string | null;
   licenseCategory: string | null;
   licenseExpiry: string | null;
@@ -64,7 +65,7 @@ function toDto(row: DriverRow): DriverDto {
     id: row.id,
     name: row.name,
     phone: row.phone,
-    email: row.email,
+    cpf: row.cpf,
     licenseNumber: row.licenseNumber,
     licenseCategory: row.licenseCategory,
     licenseExpiry: row.licenseExpiry,
@@ -164,7 +165,7 @@ export async function createDriver(
         .values({
           name: input.name,
           phone: input.phone ?? null,
-          email: input.email ?? null,
+          cpf: input.cpf ?? null,
           licenseNumber: input.licenseNumber ?? null,
           licenseCategory: input.licenseCategory ?? null,
           licenseExpiry: input.licenseExpiry ?? null,
@@ -210,7 +211,7 @@ export async function updateDriver(
   const fields: string[] = [
     "name",
     "phone",
-    "email",
+    "cpf",
     "licenseNumber",
     "licenseCategory",
     "licenseExpiry",

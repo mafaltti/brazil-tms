@@ -1,7 +1,12 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "../client";
 import { cancellationOptions, tripEvents, trips } from "../../schema";
-import { canTransition, cancelTripSchema, type CancelTripInput } from "@brazil-tms/shared";
+import {
+  canTransition,
+  cancelTripSchema,
+  type CancelTripInput,
+  type TripStatus,
+} from "@brazil-tms/shared";
 import { writeAudit } from "../audit/write-audit";
 import { Conflict } from "../errors";
 import { recomputeTripSla } from "./sla";
@@ -21,11 +26,18 @@ import { loadTripDetail, type TripDetail } from "./trip-dto";
  * The cancellable check (`canTransition(..., "cancelled")`) runs BEFORE the transaction so a denied
  * cancel changes no state (SC-003). The single transaction writes the guarded `trips` update, the
  * append-only `status_change` event, and the audit row together so a cancellation is never unlogged.
+ *
+ * 017 (exposure slice): `opts.allowedSourceStatuses` narrows WHICH source statuses the caller may
+ * cancel from — the PRD §18 Dispatcher-"Limited" rule (the BFF passes `DISPATCH_PHASE_TRIP_STATUSES`
+ * for dispatchers; admins/ops managers pass nothing). Checked against the loaded row, and race-safe:
+ * the optimistic `WHERE current_status = <checked>` update means the status that passed the check is
+ * the status at write time (a concurrent advance yields `STALE_TRANSITION`, never a bypass).
  */
 export async function cancelTrip(
   tripId: string,
   input: CancelTripInput,
   actorUserId: string,
+  opts: { allowedSourceStatuses?: readonly TripStatus[] } = {},
 ): Promise<TripDetail> {
   // Enforces the five required inputs; a missing field throws ZodError → 400.
   const parsed = cancelTripSchema.parse(input);
@@ -53,6 +65,15 @@ export async function cancelTrip(
   const currentRows = await db.select().from(trips).where(eq(trips.id, tripId)).limit(1);
   const row = currentRows[0];
   if (!row) throw new Conflict("NOT_FOUND", "Viagem não encontrada.");
+
+  // Role-scoped source-status limit (017 FR-007 — §18 Dispatcher "Limited"), before the generic
+  // legality check so the caller gets the precise refusal reason.
+  if (opts.allowedSourceStatuses && !opts.allowedSourceStatuses.includes(row.currentStatus)) {
+    throw new Conflict(
+      "NOT_CANCELLABLE_BY_ROLE",
+      "Seu perfil só pode cancelar viagens na fase de expedição.",
+    );
+  }
 
   // Cancellable check BEFORE the transaction so a denied cancel changes no state (SC-003).
   if (!canTransition(row.currentStatus, "cancelled")) {
@@ -120,4 +141,31 @@ export async function cancelTrip(
     if (!detail) throw new Conflict("NOT_FOUND", "Viagem não encontrada.");
     return detail;
   });
+}
+
+/** One row of the config-driven cancellation value sets, as served to the cancel dialog (017 R3). */
+export interface CancellationOptionItem {
+  kind: "reason" | "billing_impact";
+  code: string;
+  labelPt: string;
+  sortOrder: number;
+}
+
+/**
+ * ACTIVE cancellation options for the cancel dialog (017 R3; FR-004), ordered `kind, sort_order`.
+ * Serves `GET /api/cancellation-options` — NOT `/api/reason-codes`, which is the 007 EXCEPTION
+ * reason-code table (a different domain kept deliberately separate). Bounded config list, no paging.
+ */
+export async function queryCancellationOptions(): Promise<CancellationOptionItem[]> {
+  const rows = await db
+    .select({
+      kind: cancellationOptions.kind,
+      code: cancellationOptions.code,
+      labelPt: cancellationOptions.labelPt,
+      sortOrder: cancellationOptions.sortOrder,
+    })
+    .from(cancellationOptions)
+    .where(eq(cancellationOptions.active, true))
+    .orderBy(asc(cancellationOptions.kind), asc(cancellationOptions.sortOrder));
+  return rows.map((r) => ({ ...r, kind: r.kind as CancellationOptionItem["kind"] }));
 }

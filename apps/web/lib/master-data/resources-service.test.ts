@@ -84,6 +84,52 @@ describe.skipIf(!hasDb)("resources-service (integration)", () => {
     expect(audits).toHaveLength(1);
   });
 
+  it("driver CPF round-trips on create/update and clears with null (issue #28)", async () => {
+    const dto = await createDriver(
+      { name: "Motorista CPF", ownershipType: "owned", cpf: "39053344705" },
+      actorId,
+    );
+    driverIds.push(dto.id);
+    expect(dto.cpf).toBe("39053344705");
+
+    const updated = await updateDriver(dto.id, { cpf: "52998224725" }, actorId);
+    expect(updated.cpf).toBe("52998224725");
+
+    const cleared = await updateDriver(dto.id, { cpf: null }, actorId);
+    expect(cleared.cpf).toBeNull();
+  });
+
+  it("vehicle registry identifiers round-trip on create/update and clear with null (issue #30)", async () => {
+    const dto = await createVehicle(
+      {
+        plate: plate(),
+        vehicleType: "truck",
+        ownershipType: "owned",
+        anttNumber: "12345678",
+        renavam: "12345678901",
+        chassis: "9BWZZZ377VT004251",
+      },
+      actorId,
+    );
+    vehicleIds.push(dto.id);
+    expect(dto.anttNumber).toBe("12345678");
+    expect(dto.renavam).toBe("12345678901");
+    expect(dto.chassis).toBe("9BWZZZ377VT004251");
+
+    const updated = await updateVehicle(dto.id, { renavam: "98765432100" }, actorId);
+    expect(updated.renavam).toBe("98765432100");
+    expect(updated.chassis).toBe("9BWZZZ377VT004251"); // untouched fields stay
+
+    const cleared = await updateVehicle(
+      dto.id,
+      { anttNumber: null, renavam: null, chassis: null },
+      actorId,
+    );
+    expect(cleared.anttNumber).toBeNull();
+    expect(cleared.renavam).toBeNull();
+    expect(cleared.chassis).toBeNull();
+  });
+
   it("createVehicle (owned) emits vehicle.create; createTrailer (owned) emits trailer.create", async () => {
     const v = await createVehicle(
       { plate: plate(), vehicleType: "truck", ownershipType: "owned" },

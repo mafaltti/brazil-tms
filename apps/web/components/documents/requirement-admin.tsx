@@ -8,6 +8,7 @@ import {
   useCreateDocumentRequirement,
   useDocumentRequirements,
   useDocumentTypes,
+  useFilterOptions,
   useUpdateDocumentRequirement,
 } from "@/lib/trips/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +27,9 @@ import {
  * (or the "sign-off blocked" notice when it has none — running on DEFAULT), and add a requirement
  * (type + completion/billing flags + optional lane/vehicle-type scope). Writes gated `manage_commercial_data`.
  */
-export function RequirementAdmin({ options }: { options: TripFilterOptions }) {
+export function RequirementAdmin({ options: initialOptions }: { options: TripFilterOptions }) {
+  // 019 — keep the lists fresh on an open tab (60s poll + focus refetch); server data seeds it.
+  const options = useFilterOptions(initialOptions);
   const t = useTranslations("Documents.requirementsAdmin");
   const tVeh = useTranslations("VehicleTypes");
   const types = useDocumentTypes();

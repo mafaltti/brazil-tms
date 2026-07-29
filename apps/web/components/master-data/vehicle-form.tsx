@@ -9,6 +9,7 @@ import {
   type CreateVehicleInput,
 } from "@brazil-tms/shared";
 import { Input } from "@/components/ui/input";
+import { DocumentReadButton } from "@/components/master-data/document-read-button";
 import { EntityFormShell, Field } from "@/components/master-data/entity-form";
 import {
   EnumSelect,
@@ -51,6 +52,9 @@ export function VehicleForm({
     defaultValues: {
       plate: "",
       vehicleType: undefined,
+      anttNumber: "",
+      renavam: "",
+      chassis: "",
       capacityKg: undefined,
       ownershipType: "owned",
       carrierId: "",
@@ -74,6 +78,26 @@ export function VehicleForm({
       onCancel={onCancel}
       onSubmit={handleSubmit((values) => onSubmit(values))}
     >
+      {/* 021 (issue #29) — CRLV read prefills the mapped fields for REVIEW; saving stays manual. */}
+      <DocumentReadButton
+        docType="crlv"
+        fieldLabels={{
+          plate: t("plate"),
+          vehicleType: t("vehicleType"),
+          documentExpiry: t("documentExpiry"),
+        }}
+        onExtracted={(fields) => {
+          for (const [key, value] of Object.entries(fields)) {
+            setValue(key as "plate" | "vehicleType" | "documentExpiry", value as never, {
+              shouldDirty: true,
+              shouldValidate: true,
+            });
+          }
+        }}
+      />
+
+      {/* Issue #30 [0007]: the registry identifiers sit together (Placa/Tipo/Renavam/ANTT) and
+          Capacidade shares a half-width row with Chassi instead of spanning the form. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label={t("plate")} htmlFor="plate" required error={fieldMessage(errors.plate)}>
           <Input id="plate" {...register("plate")} />
@@ -87,11 +111,19 @@ export function VehicleForm({
           required
           error={fieldMessage(errors.vehicleType)}
         />
+        <Field label={t("renavam")} htmlFor="renavam" error={fieldMessage(errors.renavam)}>
+          <Input id="renavam" inputMode="numeric" {...register("renavam")} />
+        </Field>
+        <Field label={t("anttNumber")} htmlFor="anttNumber" error={fieldMessage(errors.anttNumber)}>
+          <Input id="anttNumber" {...register("anttNumber")} />
+        </Field>
+        <Field label={t("chassis")} htmlFor="chassis" error={fieldMessage(errors.chassis)}>
+          <Input id="chassis" {...register("chassis")} />
+        </Field>
+        <Field label={t("capacityKg")} htmlFor="capacityKg" error={fieldMessage(errors.capacityKg)}>
+          <Input id="capacityKg" type="number" min={0} {...register("capacityKg")} />
+        </Field>
       </div>
-
-      <Field label={t("capacityKg")} htmlFor="capacityKg" error={fieldMessage(errors.capacityKg)}>
-        <Input id="capacityKg" type="number" min={0} {...register("capacityKg")} />
-      </Field>
 
       <OwnershipCarrierFields
         control={control}

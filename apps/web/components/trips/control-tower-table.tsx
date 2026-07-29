@@ -35,7 +35,9 @@ import {
 import { TripStatusBadge } from "@/components/trips/trip-status-badge";
 import { TripFilters } from "@/components/trips/trip-filters";
 import { AssignmentForm } from "@/components/trips/dispatch/assignment-form";
-import { useTripBoard, useTripBoardFilters } from "@/lib/trips/client";
+import { CancelTripDialog } from "@/components/trips/cancel-trip-dialog";
+import { canCancelTrip, type CancelScope } from "@/lib/trips/cancel-scope";
+import { useFilterOptions, useTripBoard, useTripBoardFilters } from "@/lib/trips/client";
 
 /** Board `sort` values that map to a column header (R2 whitelist). */
 type SortKey = TripBoardQuery["sort"];
@@ -49,21 +51,29 @@ type SortKey = TripBoardQuery["sort"];
  * rendered as filterable/sortable columns here.
  */
 export function ControlTowerTable({
-  filterOptions,
+  filterOptions: initialFilterOptions,
   canAssign = false,
+  cancelScope = "none",
 }: {
   filterOptions: TripFilterOptions;
   /** 006 — additively reveal the per-row quick-assign action for `assign_resources` holders. */
   canAssign?: boolean;
+  /** 017 — how far this user's cancel permission reaches (§18); computed server-side. */
+  cancelScope?: CancelScope;
 }) {
+  // 019 — keep filters + quick-assign pickers fresh on an open tab; server data seeds it.
+  const filterOptions = useFilterOptions(initialFilterOptions);
   const t = useTranslations("Trips");
   const tCommon = useTranslations("Common");
   const tVehicle = useTranslations("VehicleTypes");
   const tDispatch = useTranslations("Dispatch");
+  const tCancel = useTranslations("Trips.cancel");
   const { query, search, setFilters, reset } = useTripBoardFilters();
 
   // The row whose quick-assign dialog is open (006, T063). One dialog instance, fed the row in scope.
   const [assignRow, setAssignRow] = useState<TripBoardRow | null>(null);
+  // The row whose cancel dialog is open (017). Same one-instance pattern.
+  const [cancelRow, setCancelRow] = useState<TripBoardRow | null>(null);
 
   /** Label a (possibly unknown) vehicle-type string via the `VehicleTypes` namespace; "—" if absent. */
   function vehicleLabel(vt: string | null): string {
@@ -180,29 +190,46 @@ export function ControlTowerTable({
       header: () => <SortableHeader label={t("board.colUpdatedAt")} sortKey="updatedAt" />,
       cell: ({ row }) => formatDateTime(row.original.updatedAt),
     },
-    // 006 — per-row quick-assign action (FR-022 third entry point); only for `assign_resources`
-    // holders on an assignable trip. Opens the shared AssignmentForm in a dialog.
-    ...(canAssign
+    // 006 — per-row quick-assign action (FR-022 third entry point) for `assign_resources` holders;
+    // 017 — per-row cancel action for `cancelScope` holders. One actions column serving both.
+    ...(canAssign || cancelScope !== "none"
       ? [
           {
             id: "actions",
             header: () => tCommon("actions"),
-            cell: ({ row }: { row: { original: TripBoardRow } }) =>
-              // Quick-assign is ASSIGN-only: shown for an UNASSIGNED `received` trip (slice 015; was
-              // `validated`). Reassigning an already-assigned trip needs the full current-assignment
-              // context (resources pre-filled), which only the Trip-Detail panel has — the board row
-              // carries just display names — so an assigned row is reached via its detail link, not a
-              // blank reassign form here.
-              !row.original.isAssigned && row.original.currentStatus === "received" ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setAssignRow(row.original)}
-                >
-                  {tDispatch("assignAction")}
-                </Button>
-              ) : null,
+            cell: ({ row }: { row: { original: TripBoardRow } }) => (
+              <div className="flex gap-2">
+                {/* Quick-assign is ASSIGN-only: shown for an UNASSIGNED `received` trip (slice 015;
+                    was `validated`). Reassigning an already-assigned trip needs the full
+                    current-assignment context (resources pre-filled), which only the Trip-Detail
+                    panel has — the board row carries just display names — so an assigned row is
+                    reached via its detail link, not a blank reassign form here. */}
+                {canAssign &&
+                !row.original.isAssigned &&
+                row.original.currentStatus === "received" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAssignRow(row.original)}
+                  >
+                    {tDispatch("assignAction")}
+                  </Button>
+                ) : null}
+                {/* 017 — cancel (issue #24): scope ∩ machine legality, per row status. */}
+                {canCancelTrip(cancelScope, row.original.currentStatus) ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() => setCancelRow(row.original)}
+                  >
+                    {tCancel("action")}
+                  </Button>
+                ) : null}
+              </div>
+            ),
           } as ColumnDef<TripBoardRow>,
         ]
       : []),
@@ -324,6 +351,16 @@ export function ControlTowerTable({
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Cancel dialog (017) — the shared justified flow; one instance fed the row in scope. */}
+      {cancelRow ? (
+        <CancelTripDialog
+          tripId={cancelRow.id}
+          tripLabel={cancelRow.externalTripId}
+          open
+          onOpenChange={(open) => !open && setCancelRow(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -53,10 +53,24 @@ test.describe("US3 — Resources (drivers, vehicles, trailers)", () => {
     await page.getByRole("button", { name: "Novo motorista" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
+
+    // Issue #28 [0005]: the form offers CPF and no longer offers E-mail.
+    await expect(dialog.getByLabel("CPF", { exact: true })).toBeVisible();
+    await expect(dialog.getByLabel("E-mail")).toHaveCount(0);
+
     await dialog.getByLabel("Nome", { exact: true }).fill(name);
+    await dialog.getByLabel("CPF", { exact: true }).fill("390.533.447-05");
     await dialog.getByRole("button", { name: "Criar motorista" }).click();
 
     await expect(page.getByRole("row", { name: new RegExp(name) })).toBeVisible();
+
+    // The punctuated CPF was normalized to 11 digits and round-trips into the edit form.
+    await page
+      .getByRole("row", { name: new RegExp(name) })
+      .getByRole("link", { name: "Editar" })
+      .click();
+    await page.waitForURL((url) => url.pathname.startsWith("/resources/drivers/"));
+    await expect(page.getByLabel("CPF", { exact: true })).toHaveValue("39053344705");
   });
 
   test("admin creates an owned vehicle; a past document expiry shows 'Vencido'", async ({
@@ -71,12 +85,25 @@ test.describe("US3 — Resources (drivers, vehicles, trailers)", () => {
     await expect(dialog).toBeVisible();
     await dialog.getByLabel("Placa", { exact: true }).fill(plate);
     await selectOption(page, "vehicleType", "Truck");
+
+    // Issue #30 [0007]: the registry identifiers are captured and normalized (Renavam strips
+    // punctuation; chassi uppercases) — verified on the edit round-trip below.
+    await dialog.getByLabel("Renavam", { exact: true }).fill("1234.567.890-1");
+    await dialog.getByLabel("ANTT", { exact: true }).fill("12345678");
+    await dialog.getByLabel("Chassi", { exact: true }).fill("9bwzzz377vt004251");
+
     await dialog.getByLabel("Validade do documento").fill(isoOffsetDays(-1));
     await dialog.getByRole("button", { name: "Criar veículo" }).click();
 
     const row = page.getByRole("row", { name: new RegExp(plate) });
     await expect(row).toBeVisible();
     await expect(row.getByText(PT.expired)).toBeVisible();
+
+    await row.getByRole("link", { name: "Editar" }).click();
+    await page.waitForURL((url) => url.pathname.startsWith("/resources/vehicles/"));
+    await expect(page.getByLabel("Renavam", { exact: true })).toHaveValue("12345678901");
+    await expect(page.getByLabel("ANTT", { exact: true })).toHaveValue("12345678");
+    await expect(page.getByLabel("Chassi", { exact: true })).toHaveValue("9BWZZZ377VT004251");
   });
 
   test("a vehicle with a near expiry shows 'A vencer'", async ({ page }) => {

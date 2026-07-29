@@ -34,3 +34,4 @@ export * from "./rates";
 export * from "./export-batches";
 export * from "./billing-items";
 export * from "./billing-adjustments";
+export * from "./freight-rates";

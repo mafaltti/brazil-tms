@@ -76,7 +76,48 @@
     "billing": "Faturamento",
     "rates": "Tarifas",
     "documentRequirements": "Requisitos de Documentos",
-    "reports": "Relatórios"
+    "reports": "Relatórios",
+    "freightRates": "Tabela de Fretes"
+  },
+  "FreightRates": {
+    "screenTitle": "Tabela de Fretes",
+    "description": "Consulta de fretes de agregados por rota, veículo e preço.",
+    "filters": {
+      "originUf": "UF Origem",
+      "originCity": "Cidade Origem",
+      "destinationUf": "UF Destino",
+      "destinationCity": "Cidade Destino",
+      "priceMin": "Preço mínimo (R$)",
+      "priceMax": "Preço máximo (R$)",
+      "cityPlaceholder": "Digite a cidade",
+      "all": "Todas",
+      "clear": "Limpar filtros"
+    },
+    "columns": {
+      "origin": "Origem",
+      "destination": "Destino",
+      "km": "Km",
+      "vehicleType": "Tipo de Veículo",
+      "valorIda": "Valor Ida",
+      "valorReversa": "Valor Reversa",
+      "observacoes": "Observações"
+    },
+    "empty": {
+      "noData": "Tabela de fretes ainda não carregada.",
+      "noDataCanImport": "Tabela de fretes ainda não carregada. Envie a planilha para começar.",
+      "noMatches": "Nenhuma rota encontrada com os filtros atuais."
+    },
+    "upload": {
+      "trigger": "Enviar planilha",
+      "title": "Substituir tabela de fretes",
+      "description": "Envie a planilha padrão (aba \"Controle de Fretes\"). A tabela inteira será substituída pelo conteúdo do arquivo.",
+      "submit": "Substituir tabela",
+      "submitting": "Enviando…",
+      "success": "Tabela substituída: {routes} rotas e {rates} tarifas carregadas.",
+      "issueRow": "Linha",
+      "issueColumn": "Coluna",
+      "issueMessage": "Problema"
+    }
   },
   "Roles": {
     "admin": "Administrador",
@@ -305,7 +346,8 @@
     "rate_create": "Tarifa criada",
     "rate_update": "Tarifa atualizada",
     "billing_item_update": "Item de faturamento atualizado",
-    "billing_export": "Exportação de faturamento gerada"
+    "billing_export": "Exportação de faturamento gerada",
+    "freight_rate_replace": "Tabela de fretes substituída"
   },
   "Documents": {
     "title": "Documentos",
@@ -697,6 +739,20 @@
     "ownershipCarrierMismatch": "Recurso subcontratado exige transportadora; recurso próprio não pode ter transportadora.",
     "duplicatePlate": "Já existe um recurso com essa placa.",
     "duplicateTaxId": "Já existe uma transportadora com esse CNPJ.",
+    "aiRead": {
+      "buttonCnh": "Ler CNH (IA)",
+      "buttonCrlv": "Ler CRLV (IA)",
+      "reading": "Lendo documento…",
+      "hint": "Envie a foto ou PDF do documento para pré-preencher o cadastro. Confira os dados antes de salvar.",
+      "reviewNotice": "Campos preenchidos a partir do documento — confira e corrija antes de salvar.",
+      "unreadablePrefix": "Não foi possível ler:",
+      "nothingRead": "Não foi possível ler o documento. Verifique a imagem e tente novamente.",
+      "invalidType": "Formato não suportado. Envie JPEG, PNG, WebP, GIF ou PDF.",
+      "tooLarge": "Imagem muito grande (máximo 7,5 MB). Para PDF, o máximo é 10 MB.",
+      "notConfigured": "Leitura de documentos não configurada. Contate um administrador.",
+      "forbidden": "Seu perfil não tem permissão para usar a leitura de documentos.",
+      "failed": "Não foi possível ler o documento. Tente novamente."
+    },
     "drivers": {
       "title": "Motoristas",
       "subtitle": "Cadastro de motoristas próprios e subcontratados.",
@@ -706,7 +762,7 @@
       "searchPlaceholder": "Buscar por nome ou telefone",
       "name": "Nome",
       "phone": "Telefone",
-      "email": "E-mail",
+      "cpf": "CPF",
       "licenseNumber": "CNH",
       "licenseCategory": "Categoria",
       "licenseExpiry": "Validade da CNH",
@@ -724,6 +780,9 @@
       "searchPlaceholder": "Buscar por placa",
       "plate": "Placa",
       "vehicleType": "Tipo",
+      "anttNumber": "ANTT",
+      "renavam": "Renavam",
+      "chassis": "Chassi",
       "capacityKg": "Capacidade (kg)",
       "owner": "Proprietário",
       "trackerProvider": "Rastreador",
@@ -784,7 +843,8 @@
   "ExpiryState": {
     "ok": "Em dia",
     "expiring": "A vencer",
-    "expired": "Vencido"
+    "expired": "Vencido",
+    "notInformed": "Não informada"
   },
   "VehicleTypes": {
     "van": "Van",
@@ -970,6 +1030,39 @@
       "placeholderExceptions": "Exceções e risco de SLA — disponível em uma próxima etapa.",
       "placeholderDocuments": "Documentos da viagem — disponível em uma próxima etapa.",
       "placeholderBilling": "Detalhamento de faturamento — disponível em uma próxima etapa."
+    },
+    "cancel": {
+      "action": "Cancelar viagem",
+      "title": "Cancelar viagem",
+      "description": "O cancelamento é definitivo e exige justificativa completa (motivo, parte responsável e impacto de faturamento).",
+      "reasonLabel": "Motivo",
+      "reasonPlaceholder": "Selecione o motivo",
+      "responsibleLabel": "Parte responsável",
+      "responsiblePlaceholder": "Selecione a parte responsável",
+      "billingLabel": "Impacto de faturamento",
+      "billingPlaceholder": "Selecione o impacto",
+      "confirm": "Cancelar viagem",
+      "keep": "Voltar",
+      "submitting": "Cancelando…",
+      "success": "Viagem cancelada.",
+      "requiredField": "Campo obrigatório.",
+      "notConfigured": "Motivos de cancelamento não configurados. Contate um administrador.",
+      "errors": {
+        "NOT_CANCELLABLE": "A viagem não pode ser cancelada neste status.",
+        "NOT_CANCELLABLE_BY_ROLE": "Seu perfil só pode cancelar viagens na fase de expedição.",
+        "STALE_TRANSITION": "A viagem já mudou de status. Atualize a página e tente novamente.",
+        "CANCELLATION_NOT_CONFIGURED": "Motivos de cancelamento não configurados. Contate um administrador.",
+        "INVALID_REASON_CODE": "Motivo de cancelamento inválido.",
+        "INVALID_BILLING_IMPACT": "Impacto de faturamento inválido.",
+        "NOT_FOUND": "Viagem não encontrada.",
+        "REQUEST_FAILED": "Não foi possível cancelar a viagem. Tente novamente."
+      },
+      "responsible": {
+        "customer_caused": "Cliente",
+        "brazil_transports_caused": "Brazil Transports",
+        "carrier_caused": "Transportadora",
+        "unknown": "Desconhecida"
+      }
     },
     "auditActions": {
       "trip": {
@@ -1258,6 +1351,7 @@
     "selectCarrier": "Selecione a transportadora (opcional)",
     "noTrailer": "Sem reboque",
     "noCarrier": "Sem transportadora",
+    "searchNoResults": "Nenhum resultado",
     "assignedBy": "Atribuída por",
     "assignedAt": "Atribuída em",
     "confirmedBy": "Confirmada por",

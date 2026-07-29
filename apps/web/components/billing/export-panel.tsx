@@ -9,6 +9,7 @@ import {
   fetchExportDownloadUrl,
   useCreateExport,
   useExportBatches,
+  useFilterOptions,
 } from "@/lib/trips/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,9 @@ function brl(cents: number): string {
  * format) — the worker generates the file off the request path — and download prior batches. Notes the
  * labeled default column set + export sign-off blocked (§29 Input #4). Export writes gated `export_billing`.
  */
-export function ExportPanel({ options }: { options: TripFilterOptions }) {
+export function ExportPanel({ options: initialOptions }: { options: TripFilterOptions }) {
+  // 019 — keep the lists fresh on an open tab (60s poll + focus refetch); server data seeds it.
+  const options = useFilterOptions(initialOptions);
   const t = useTranslations("Billing.export");
   const create = useCreateExport();
   const history = useExportBatches();

@@ -3,10 +3,10 @@ import { and, eq } from "drizzle-orm";
 import { cancellationOptions, customers, db, locations, trips } from "../src";
 
 /**
- * Feature 003 trip-domain seed. Seeds the `cancellation_options` `billing_impact` value set as
- * LABELED SCAFFOLDING (Constitution II — §19.5 examples) and intentionally leaves the `reason` codes
- * EMPTY: those are business-blocked, so a production cancellation fails with
- * `CANCELLATION_NOT_CONFIGURED` until business supplies the codes (tests/e2e seed their own).
+ * Feature 003 trip-domain seed. Seeds BOTH `cancellation_options` value sets as LABELED SCAFFOLDING
+ * (Constitution II): the `billing_impact` §19.5 examples (003) and — since slice 017 (clarification
+ * 2026-07-27, spec FR-013) — a default pt-BR `reason` set so the cancel flow works out of the box.
+ * Business sign-off on the final lists remains pending; both stay config (admins may edit rows).
  *
  * Optionally anchors 1 sample trip on the `db:seed:master-data` demo customer (DEMO-SHOPEE) so the
  * read-only inspector has something to show. Idempotent: re-running is a no-op once seeded. Run AFTER
@@ -20,28 +20,41 @@ const BILLING_IMPACTS = [
   { code: "manual_review", labelPt: "Revisão manual", sortOrder: 3 },
 ] as const;
 
+// 017 defaults (FR-013) — reason scaffolding (labeled; NOT final business sign-off).
+const CANCELLATION_REASONS = [
+  { code: "cancelled_by_customer", labelPt: "Cancelado pelo cliente", sortOrder: 1 },
+  { code: "no_vehicle_available", labelPt: "Sem veículo disponível", sortOrder: 2 },
+  { code: "no_driver_available", labelPt: "Sem motorista disponível", sortOrder: 3 },
+  { code: "weather_road", labelPt: "Clima/estrada", sortOrder: 4 },
+  { code: "documentation_issue", labelPt: "Problema de documentação", sortOrder: 5 },
+  { code: "other", labelPt: "Outro", sortOrder: 6 },
+] as const;
+
 const SAMPLE_EXTERNAL_TRIP_ID = "DEMO-TRIP-001";
 
 async function seedCancellationOptions(): Promise<void> {
-  for (const b of BILLING_IMPACTS) {
-    const existing = await db
-      .select({ id: cancellationOptions.id })
-      .from(cancellationOptions)
-      .where(
-        and(eq(cancellationOptions.kind, "billing_impact"), eq(cancellationOptions.code, b.code)),
-      )
-      .limit(1);
-    if (existing[0]) continue;
-    await db.insert(cancellationOptions).values({
-      kind: "billing_impact",
-      code: b.code,
-      labelPt: b.labelPt,
-      sortOrder: b.sortOrder,
-    });
+  const sets = [
+    { kind: "billing_impact", rows: BILLING_IMPACTS },
+    { kind: "reason", rows: CANCELLATION_REASONS },
+  ] as const;
+  for (const { kind, rows } of sets) {
+    for (const r of rows) {
+      const existing = await db
+        .select({ id: cancellationOptions.id })
+        .from(cancellationOptions)
+        .where(and(eq(cancellationOptions.kind, kind), eq(cancellationOptions.code, r.code)))
+        .limit(1);
+      if (existing[0]) continue;
+      await db.insert(cancellationOptions).values({
+        kind,
+        code: r.code,
+        labelPt: r.labelPt,
+        sortOrder: r.sortOrder,
+      });
+    }
   }
-  // `reason` codes are intentionally NOT seeded (business-blocked). Do not add them here.
   console.log(
-    "Seeded cancellation_options billing_impact scaffolding (no_charge, cancellation_fee, manual_review); reason codes left EMPTY (business-blocked).",
+    "Seeded cancellation_options scaffolding: billing_impact (no_charge, cancellation_fee, manual_review) + reason (017 defaults — business sign-off pending).",
   );
 }
 
