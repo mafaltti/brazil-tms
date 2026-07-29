@@ -64,6 +64,13 @@
       "when": 1780862362250,
       "tag": "0008_collapse_validation_statuses",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783974019625,
+      "tag": "0009_freight_rates",
+      "breakpoints": true
     }
   ]
 }
