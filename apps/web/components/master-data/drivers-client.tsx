@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { CreateDriverInput } from "@brazil-tms/shared";
 import { Badge } from "@/components/ui/badge";
+import { ExpiryCell } from "@/components/master-data/expiry-cell";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,7 +29,6 @@ export function DriversClient({ canArchive }: { canArchive: boolean }) {
   const t = useTranslations("Resources.drivers");
   const tResources = useTranslations("Resources");
   const tStatus = useTranslations("ResourceStatus");
-  const tExpiry = useTranslations("ExpiryState");
   const tMaster = useTranslations("MasterData");
   const queryClient = useQueryClient();
 
@@ -97,15 +97,10 @@ export function DriversClient({ canArchive }: { canArchive: boolean }) {
     {
       id: "_expiry",
       header: () => t("licenseExpiry"),
-      cell: ({ row }) => {
-        const state = row.original.documentExpiryState;
-        if (state === "ok") return <span className="text-muted-foreground">—</span>;
-        return (
-          <Badge variant={state === "expired" ? "destructive" : "outline"}>
-            {tExpiry(state)}
-          </Badge>
-        );
-      },
+      // 020 (issue #27) — the date itself + warning/expired states; null reads "Não informada".
+      cell: ({ row }) => (
+        <ExpiryCell date={row.original.licenseExpiry} state={row.original.documentExpiryState} />
+      ),
     },
   ];
 

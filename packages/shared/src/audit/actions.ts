@@ -79,7 +79,9 @@ export type AuditAction =
   | "rate.create"
   | "rate.update"
   | "billing_item.update"
-  | "billing.export";
+  | "billing.export"
+  // feature 016 — freight rate lookup: the replace-all sheet upload is the single mutation.
+  | "freight_rate.replace";
 
 /** The four actions audited by feature 001 (useful for tests / iteration). */
 export const AUDIT_ACTIONS_001: readonly AuditAction[] = [
@@ -156,6 +158,7 @@ export const ALL_AUDIT_ACTIONS = [
   "rate.update",
   "billing_item.update",
   "billing.export",
+  "freight_rate.replace",
 ] as const satisfies readonly AuditAction[];
 
 /**

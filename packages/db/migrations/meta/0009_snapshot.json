@@ -1,5 +1,5 @@
 {
-  "id": "71c49aae-3827-4f29-b26d-73efcb1b7b8b",
+  "id": "e94f2dc6-ab68-4052-b6b3-d9dabbdd7b24",
   "prevId": "e1affbc9-fdc1-4c3e-8caa-002ab09203fb",
   "version": "7",
   "dialect": "postgresql",
@@ -955,24 +955,6 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
-        },
-        "antt_number": {
-          "name": "antt_number",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "renavam": {
-          "name": "renavam",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "chassis": {
-          "name": "chassis",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "capacity_kg": {
           "name": "capacity_kg",
@@ -4665,6 +4647,270 @@
           "tableTo": "users",
           "columnsFrom": [
             "removed_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.freight_rate_imports": {
+      "name": "freight_rate_imports",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "file_name": {
+          "name": "file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uploaded_by": {
+          "name": "uploaded_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "route_count": {
+          "name": "route_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rate_count": {
+          "name": "rate_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "freight_rate_imports_created_idx": {
+          "name": "freight_rate_imports_created_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "freight_rate_imports_uploaded_by_users_id_fk": {
+          "name": "freight_rate_imports_uploaded_by_users_id_fk",
+          "tableFrom": "freight_rate_imports",
+          "tableTo": "users",
+          "columnsFrom": [
+            "uploaded_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.freight_rates": {
+      "name": "freight_rates",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "import_id": {
+          "name": "import_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "origin_uf": {
+          "name": "origin_uf",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "origin_city": {
+          "name": "origin_city",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "destination_uf": {
+          "name": "destination_uf",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "destination_city": {
+          "name": "destination_city",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "km": {
+          "name": "km",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vehicle_type": {
+          "name": "vehicle_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "valor_ida_cents": {
+          "name": "valor_ida_cents",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "valor_reversa_cents": {
+          "name": "valor_reversa_cents",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "observacoes": {
+          "name": "observacoes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "freight_rates_unique_idx": {
+          "name": "freight_rates_unique_idx",
+          "columns": [
+            {
+              "expression": "origin_uf",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "origin_city",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "destination_uf",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "destination_city",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "vehicle_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "freight_rates_origin_idx": {
+          "name": "freight_rates_origin_idx",
+          "columns": [
+            {
+              "expression": "origin_uf",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "origin_city",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "freight_rates_destination_idx": {
+          "name": "freight_rates_destination_idx",
+          "columns": [
+            {
+              "expression": "destination_uf",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "destination_city",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "freight_rates_import_id_freight_rate_imports_id_fk": {
+          "name": "freight_rates_import_id_freight_rate_imports_id_fk",
+          "tableFrom": "freight_rates",
+          "tableTo": "freight_rate_imports",
+          "columnsFrom": [
+            "import_id"
           ],
           "columnsTo": [
             "id"

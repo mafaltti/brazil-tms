@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { VEHICLE_TYPE_VALUES } from "@brazil-tms/shared";
 import type { TripFilterOptions } from "@/lib/trips/trips-read";
-import { useCreateRate, useRates } from "@/lib/trips/client";
+import { useCreateRate, useFilterOptions, useRates } from "@/lib/trips/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -33,7 +33,9 @@ function reaisToCents(input: string): number | null {
  * The toll/waiting/extra-stop rule fields are labeled gated §29 Input #5 placeholders. Writes gated
  * `edit_rates`.
  */
-export function RateAdmin({ options }: { options: TripFilterOptions }) {
+export function RateAdmin({ options: initialOptions }: { options: TripFilterOptions }) {
+  // 019 — keep the lists fresh on an open tab (60s poll + focus refetch); server data seeds it.
+  const options = useFilterOptions(initialOptions);
   const t = useTranslations("Rates");
   const tVeh = useTranslations("VehicleTypes");
   const rates = useRates();

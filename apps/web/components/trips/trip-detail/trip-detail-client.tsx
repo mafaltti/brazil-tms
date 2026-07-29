@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { TripFilterOptions } from "@brazil-tms/db";
-import { useTripDetail } from "@/lib/trips/client";
+import { useFilterOptions, useTripDetail } from "@/lib/trips/client";
+import { canCancelTrip, type CancelScope } from "@/lib/trips/cancel-scope";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CancelTripDialog } from "@/components/trips/cancel-trip-dialog";
 import { TripDetailHeader } from "@/components/trips/trip-detail/header";
 import { CustomerPlanSection } from "@/components/trips/trip-detail/customer-plan";
 import { TimelineSection } from "@/components/trips/trip-detail/timeline";
@@ -22,18 +25,27 @@ import { PlanEditForm } from "@/components/trips/plan-edit-form";
  * Trip Detail orchestrator (005 US2/US3). Read-first — freshness is polling via TanStack Query
  * (`useTripDetail`, no Realtime). Composes the section components in the §15.5 order. The plan editor
  * self-guards on `isNonEditableStatus`, so it is always rendered (it shows a read-only message when
- * the trip is closed/terminal).
+ * the trip is closed/terminal). 017: the header row carries the "Cancelar viagem" action
+ * (`cancelScope` ∩ machine legality); on success the `["trips"]` invalidation re-renders this page
+ * with the terminal state.
  */
 export function TripDetailClient({
   id,
-  resourceOptions,
+  resourceOptions: initialResourceOptions,
+  cancelScope = "none",
 }: {
   id: string;
   resourceOptions: TripFilterOptions;
+  /** 017 — how far this user's cancel permission reaches (§18); computed server-side. */
+  cancelScope?: CancelScope;
 }) {
+  // 019 — keep the assignment pickers fresh on an open tab (60s poll + focus refetch); server seed.
+  const resourceOptions = useFilterOptions(initialResourceOptions);
   const t = useTranslations("Trips.detail");
+  const tCancel = useTranslations("Trips.cancel");
   const tCommon = useTranslations("Common");
   const { data, isLoading, isError } = useTripDetail(id);
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   const backLink = (
     <Button asChild variant="outline">
@@ -63,12 +75,25 @@ export function TripDetailClient({
   }
 
   const trip = data.item;
+  const showCancel = canCancelTrip(cancelScope, trip.currentStatus);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         {backLink}
+        {showCancel ? (
+          <Button type="button" variant="destructive" onClick={() => setCancelOpen(true)}>
+            {tCancel("action")}
+          </Button>
+        ) : null}
       </div>
+
+      <CancelTripDialog
+        tripId={trip.id}
+        tripLabel={trip.externalTripId}
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+      />
 
       <TripDetailHeader trip={trip} />
       <CustomerPlanSection trip={trip} />

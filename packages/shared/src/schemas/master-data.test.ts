@@ -141,6 +141,44 @@ describe("ownership/carrier invariant (US3/US4)", () => {
     );
   });
 
+  it("driver: CPF normalizes punctuation to 11 digits; wrong length rejected; blank clears (issue #28)", () => {
+    const punctuated = createDriverSchema.safeParse({
+      name: "João",
+      ownershipType: "owned",
+      cpf: "390.533.447-05",
+    });
+    expect(punctuated.success).toBe(true);
+    if (punctuated.success) expect(punctuated.data.cpf).toBe("39053344705");
+
+    expect(
+      createDriverSchema.safeParse({ name: "João", ownershipType: "owned", cpf: "12345" }).success,
+    ).toBe(false);
+
+    // Regression (Codex review, 2026-07-28): stray letters/symbols around an otherwise-valid CPF
+    // must FAIL — only supported separators (dot/hyphen/space) are stripped, never \D wholesale.
+    expect(
+      createDriverSchema.safeParse({
+        name: "João",
+        ownershipType: "owned",
+        cpf: "abc390.533.447-05xyz",
+      }).success,
+    ).toBe(false);
+
+    const cleared = updateDriverSchema.parse({ cpf: "" });
+    expect(cleared.cpf).toBeNull();
+    const absent = updateDriverSchema.parse({ name: "João" });
+    expect("cpf" in absent).toBe(false);
+
+    // The e-mail field left the driver surface: an unknown key is stripped, never validated.
+    const withEmail = createDriverSchema.safeParse({
+      name: "João",
+      ownershipType: "owned",
+      email: "x@y.com",
+    });
+    expect(withEmail.success).toBe(true);
+    if (withEmail.success) expect("email" in withEmail.data).toBe(false);
+  });
+
   it("vehicle: Renavam strips punctuation (9–11 digits); chassi normalizes to VIN-17; ANTT free text (issue #30)", () => {
     const ok = createVehicleSchema.safeParse({
       plate: "ABC1D23",

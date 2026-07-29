@@ -37,9 +37,11 @@ import {
 import type {
   TripBoardRow,
   TripDetailView,
+  TripFilterOptions,
   DashboardSummary,
   ExceptionListItem,
   ReasonCodeOption,
+  CancellationOptionItem,
   AlertListItem,
   AlertListResult,
   CustomerSlaRuleItem,
@@ -69,6 +71,8 @@ export const DASHBOARD_POLL_MS = 60_000;
 export const TRIP_DETAIL_POLL_MS = 30_000;
 /** Reports + audit view — coarse aggregates / forensic browse; 60s polling (matches the dashboard). */
 export const REPORTS_POLL_MS = 60_000;
+/** Filter/resource option lists — bounded master data; 60s polling + focus refetch (019, issue #26). */
+export const FILTER_OPTIONS_POLL_MS = 60_000;
 /** Synchronous CSV export row cap (R13); single source in @brazil-tms/shared, re-exported for UI copy. */
 export { EXPORT_ROW_CAP };
 
@@ -160,6 +164,26 @@ export function useTripBoard(search: string): UseQueryResult<TripBoardResponse> 
     queryFn: async () => asJson<TripBoardResponse>(await fetch(`/api/trips?${search}`)),
     refetchInterval: CONTROL_TOWER_POLL_MS,
   });
+}
+
+/**
+ * Fresh filter/resource option lists (019, issue #26). Every option-loaded page still fetches the
+ * lists server-side and passes them here as the SEED (`initialData` — first paint identical, no
+ * double-fetch on mount); from then on the open tab keeps them fresh: 60 s polling + the TanStack
+ * default focus refetch, so a driver registered mid-shift appears in the pickers without a reload.
+ * A failed refresh keeps the last-known lists (stale-but-usable). Key is its own root — the lists
+ * are master data, not trip data, so `["trips"]` invalidations don't churn them.
+ */
+export function useFilterOptions(initial: TripFilterOptions): TripFilterOptions {
+  const query = useQuery({
+    queryKey: ["filter-options"],
+    queryFn: async () =>
+      (await asJson<{ options: TripFilterOptions }>(await fetch(`/api/trips/filter-options`)))
+        .options,
+    initialData: initial,
+    refetchInterval: FILTER_OPTIONS_POLL_MS,
+  });
+  return query.data ?? initial;
 }
 
 /** Trip Detail for a single trip (404 → TripsError("NOT_FOUND")). */
@@ -690,6 +714,51 @@ export function useMarkBillingReady(id: string) {
   return useMutation({
     mutationFn: async (input: { waivedRequirements?: WaivedRequirementInput[] } = {}) => {
       const res = await fetch(`/api/trips/${id}/billing-ready`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      return asJson<{ item: TripDetailView }>(res);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: TRIPS_ROOT });
+    },
+  });
+}
+
+// --- Cancellation hooks (017 — issue #24; contracts/trip-cancellation-api.md) --------------------
+
+/** The §19.5 user inputs — the BFF supplies `cancelled_at` itself (server now(), FR-005). */
+export interface CancelTripFormInput {
+  reasonCode: string;
+  responsibleParty: string;
+  billingImpact: string;
+}
+
+/**
+ * Active cancellation options for the cancel dialog (GET /api/cancellation-options) — both kinds
+ * (`reason` | `billing_impact`), config-grade staleness (no polling; refetched on mount/invalidate).
+ * NOT `useReasonCodes` — that hook serves the 007 EXCEPTION reason codes.
+ */
+export function useCancellationOptions(): UseQueryResult<{ items: CancellationOptionItem[] }> {
+  return useQuery({
+    queryKey: [...TRIPS_ROOT, "cancellation-options"],
+    queryFn: async () =>
+      asJson<{ items: CancellationOptionItem[] }>(await fetch(`/api/cancellation-options`)),
+  });
+}
+
+/**
+ * Cancel a trip with full §19.5 justification (POST /api/trips/:id/cancel — the ONLY path to
+ * `cancelled`). 409 codes surface via `TripsError` (NOT_CANCELLABLE, NOT_CANCELLABLE_BY_ROLE,
+ * STALE_TRANSITION, CANCELLATION_NOT_CONFIGURED, …). Invalidates the `["trips"]` root so the
+ * detail, Control Tower list, and dispatch queue all refetch.
+ */
+export function useCancelTrip(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CancelTripFormInput) => {
+      const res = await fetch(`/api/trips/${id}/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),

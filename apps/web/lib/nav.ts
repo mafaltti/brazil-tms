@@ -30,6 +30,9 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { key: "documents", href: "/documents", icon: "FileCheck", permission: "view_all_trips" },
   { key: "billing", href: "/billing", icon: "Receipt", permission: "view_all_trips" },
   { key: "rates", href: "/billing/rates", icon: "DollarSign", permission: "edit_rates" },
+  // 016 — Freight rate lookup / "Tabela de Fretes" (view_freight_rates: all 7 internal roles).
+  // NOT named "Rotas": that label belongs to the Lanes screen below.
+  { key: "freightRates", href: "/freight-rates", icon: "Banknote", permission: "view_freight_rates" },
   // 009 — Reports (view_all_trips: all 7 internal roles, mirroring the 005 dashboard).
   { key: "reports", href: "/reports", icon: "BarChart3", permission: "view_all_trips" },
   { key: "adminUsers", href: "/admin/users", icon: "Users", permission: "manage_users" },

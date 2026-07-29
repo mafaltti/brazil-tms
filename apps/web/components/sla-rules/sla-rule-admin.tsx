@@ -4,7 +4,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useTranslations } from "next-intl";
 import { VEHICLE_TYPE_VALUES, type CreateSlaRuleInput } from "@brazil-tms/shared";
 import type { TripFilterOptions } from "@/lib/trips/trips-read";
-import { TripsError, useCreateSlaRule, useCustomerSlaRules } from "@/lib/trips/client";
+import { TripsError, useCreateSlaRule, useCustomerSlaRules, useFilterOptions } from "@/lib/trips/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,9 @@ import {
 
 const ANY = "__any__";
 
-export function SlaRuleAdmin({ options }: { options: TripFilterOptions }) {
+export function SlaRuleAdmin({ options: initialOptions }: { options: TripFilterOptions }) {
+  // 019 — keep the lists fresh on an open tab (60s poll + focus refetch); server data seeds it.
+  const options = useFilterOptions(initialOptions);
   const t = useTranslations("Sla.rules");
   const tErr = useTranslations("Sla.errors");
   const tVehicle = useTranslations("VehicleTypes");

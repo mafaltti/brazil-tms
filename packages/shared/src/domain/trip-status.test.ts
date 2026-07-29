@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACTIVE_TRIP_STATUSES,
   BILLING_PHASE_STATUSES,
+  DISPATCH_PHASE_TRIP_STATUSES,
   NON_EDITABLE_TRIP_STATUSES,
   TRANSITIONS,
   TRIP_CRITICAL_FIELDS,
@@ -29,6 +30,25 @@ describe("TRIP_STATUSES", () => {
 
   it("does NOT contain 'warning' — a validation warning is an attention flag, not a status (FR-012)", () => {
     expect((TRIP_STATUSES as readonly string[]).includes("warning")).toBe(false);
+  });
+});
+
+describe("DISPATCH_PHASE_TRIP_STATUSES (017 R2 — the §18 Dispatcher-'Limited' cancel boundary)", () => {
+  it("is exactly the three pre-execution statuses, in lifecycle order", () => {
+    expect(DISPATCH_PHASE_TRIP_STATUSES).toEqual(["received", "assigned", "confirmed"]);
+  });
+
+  it("is a subset of TRIP_STATUSES and of the active/open set", () => {
+    for (const s of DISPATCH_PHASE_TRIP_STATUSES) {
+      expect(TRIP_STATUSES).toContain(s);
+      expect(isActiveStatus(s)).toBe(true);
+    }
+  });
+
+  it("every member is legally cancellable (the limit narrows, never widens, cancellability)", () => {
+    for (const s of DISPATCH_PHASE_TRIP_STATUSES) {
+      expect(canTransition(s, "cancelled")).toBe(true);
+    }
   });
 });
 

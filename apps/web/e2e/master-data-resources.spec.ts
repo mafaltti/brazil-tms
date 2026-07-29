@@ -53,10 +53,24 @@ test.describe("US3 — Resources (drivers, vehicles, trailers)", () => {
     await page.getByRole("button", { name: "Novo motorista" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
+
+    // Issue #28 [0005]: the form offers CPF and no longer offers E-mail.
+    await expect(dialog.getByLabel("CPF", { exact: true })).toBeVisible();
+    await expect(dialog.getByLabel("E-mail")).toHaveCount(0);
+
     await dialog.getByLabel("Nome", { exact: true }).fill(name);
+    await dialog.getByLabel("CPF", { exact: true }).fill("390.533.447-05");
     await dialog.getByRole("button", { name: "Criar motorista" }).click();
 
     await expect(page.getByRole("row", { name: new RegExp(name) })).toBeVisible();
+
+    // The punctuated CPF was normalized to 11 digits and round-trips into the edit form.
+    await page
+      .getByRole("row", { name: new RegExp(name) })
+      .getByRole("link", { name: "Editar" })
+      .click();
+    await page.waitForURL((url) => url.pathname.startsWith("/resources/drivers/"));
+    await expect(page.getByLabel("CPF", { exact: true })).toHaveValue("39053344705");
   });
 
   test("admin creates an owned vehicle; a past document expiry shows 'Vencido'", async ({

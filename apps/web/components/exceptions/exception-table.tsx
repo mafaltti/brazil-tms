@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { formatDateTime } from "@brazil-tms/shared";
 import type { TripFilterOptions } from "@/lib/trips/trips-read";
-import { useExceptions } from "@/lib/trips/client";
+import { useExceptions, useFilterOptions } from "@/lib/trips/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -52,7 +52,9 @@ function toSearch(value: ExceptionFiltersValue): string {
   return params.toString();
 }
 
-export function ExceptionTable({ options }: { options: TripFilterOptions }) {
+export function ExceptionTable({ options: initialOptions }: { options: TripFilterOptions }) {
+  // 019 — keep the lists fresh on an open tab (60s poll + focus refetch); server data seeds it.
+  const options = useFilterOptions(initialOptions);
   const t = useTranslations("Exceptions");
   const [filters, setFilters] = useState<ExceptionFiltersValue>({});
   const search = useMemo(() => toSearch(filters), [filters]);
