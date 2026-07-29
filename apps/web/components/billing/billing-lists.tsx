@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { TripFilterOptions } from "@/lib/trips/trips-read";
-import { useBillingList } from "@/lib/trips/client";
+import { useBillingList, useFilterOptions } from "@/lib/trips/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -76,7 +76,9 @@ function ListTable({
 }
 
 /** The billing pending + ready lists (008, US5). Filter customer + period. 30s polling. */
-export function BillingLists({ options }: { options: TripFilterOptions }) {
+export function BillingLists({ options: initialOptions }: { options: TripFilterOptions }) {
+  // 019 — keep the lists fresh on an open tab (60s poll + focus refetch); server data seeds it.
+  const options = useFilterOptions(initialOptions);
   const t = useTranslations("Billing.lists");
   const [customerId, setCustomerId] = useState("");
   const [period, setPeriod] = useState("");

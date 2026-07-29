@@ -30,6 +30,7 @@ const EXPECTED: Record<RoleType, PermissionKey[]> = {
     "manage_commercial_data",
     "manage_fleet_data",
     "manage_trips",
+    "view_freight_rates",
   ],
   dispatcher: [
     "view_all_trips",
@@ -40,6 +41,7 @@ const EXPECTED: Record<RoleType, PermissionKey[]> = {
     "create_exceptions",
     "resolve_exceptions",
     "upload_documents",
+    "view_freight_rates",
   ],
   control_tower: [
     "view_all_trips",
@@ -49,6 +51,7 @@ const EXPECTED: Record<RoleType, PermissionKey[]> = {
     "create_exceptions",
     "resolve_exceptions",
     "upload_documents",
+    "view_freight_rates",
   ],
   fleet_coordinator: [
     "view_all_trips",
@@ -57,6 +60,7 @@ const EXPECTED: Record<RoleType, PermissionKey[]> = {
     "resolve_exceptions",
     "upload_documents",
     "manage_fleet_data",
+    "view_freight_rates",
   ],
   finance: [
     "view_all_trips",
@@ -66,8 +70,10 @@ const EXPECTED: Record<RoleType, PermissionKey[]> = {
     "verify_documents",
     "edit_rates",
     "export_billing",
+    "view_freight_rates",
+    "import_freight_rates",
   ],
-  executive_viewer: ["view_all_trips"],
+  executive_viewer: ["view_all_trips", "view_freight_rates"],
 };
 
 const ALL_ROLES = Object.values(Role);
@@ -98,9 +104,11 @@ describe("invariants", () => {
     }
   });
 
-  it("Executive Viewer can only view_all_trips", () => {
+  it("Executive Viewer can only view_all_trips and view_freight_rates (016)", () => {
     for (const key of ALL_PERMISSIONS) {
-      expect(can(Role.ExecutiveViewer, key)).toBe(key === "view_all_trips");
+      expect(can(Role.ExecutiveViewer, key)).toBe(
+        key === "view_all_trips" || key === "view_freight_rates",
+      );
     }
   });
 

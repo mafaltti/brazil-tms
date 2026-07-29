@@ -15,9 +15,13 @@ import {
   trips,
   users,
 } from "@brazil-tms/db";
-import type { CancelTripInput, TripStatus } from "@brazil-tms/shared";
+import {
+  DISPATCH_PHASE_TRIP_STATUSES,
+  type CancelTripInput,
+  type TripStatus,
+} from "@brazil-tms/shared";
 import { Conflict } from "@/lib/api/respond";
-import { cancelTrip } from "./trip-cancellation";
+import { cancelTrip, queryCancellationOptions } from "./trip-cancellation";
 
 /**
  * Integration test for `cancelTrip` (US4) against the live dev DB. Static imports per project
@@ -25,9 +29,9 @@ import { cancelTrip } from "./trip-cancellation";
  *   $env:DATABASE_URL='postgres://postgres:postgres@localhost:5433/postgres'
  *   pnpm --filter @brazil-tms/web exec vitest run lib/trips/trip-cancellation.test.ts
  *
- * `cancellation_options` ships EMPTY (no seed); this suite seeds AND clears its OWN config rows so it
- * never depends on, nor pollutes, the shared table. Each cancel uses a DISTINCT trip so cases don't
- * interfere.
+ * This suite seeds AND clears its OWN config rows so it never depends on, nor pollutes, the shared
+ * table (since 017 the seed also ships default `reason` rows — the suite stays self-contained and
+ * restores anything it deactivates). Each cancel uses a DISTINCT trip so cases don't interfere.
  */
 const hasDb = Boolean(process.env.DATABASE_URL);
 
@@ -264,11 +268,13 @@ describe.skipIf(!hasDb)("trip-cancellation (integration)", () => {
 
   // Run LAST among config-dependent cases: it deactivates the reason rows, then restores them.
   it("fails with CANCELLATION_NOT_CONFIGURED when no active reason rows exist", async () => {
-    // Deactivate ALL active reason rows (the table may hold rows beyond this suite's own).
-    await db
+    // Deactivate ALL active reason rows (the table may hold rows beyond this suite's own — since
+    // 017 the seed ships defaults), remembering exactly which ids were active to restore them.
+    const deactivated = await db
       .update(cancellationOptions)
       .set({ active: false })
-      .where(and(eq(cancellationOptions.kind, "reason"), eq(cancellationOptions.active, true)));
+      .where(and(eq(cancellationOptions.kind, "reason"), eq(cancellationOptions.active, true)))
+      .returning({ id: cancellationOptions.id });
 
     try {
       const tripId = await insertTrip("in_transit");
@@ -276,11 +282,70 @@ describe.skipIf(!hasDb)("trip-cancellation (integration)", () => {
         code: "CANCELLATION_NOT_CONFIGURED",
       });
     } finally {
-      // Restore THIS suite's reason row so afterAll cleanup and any later run is consistent.
-      await db
-        .update(cancellationOptions)
-        .set({ active: true })
-        .where(eq(cancellationOptions.code, reasonCode));
+      // Restore EVERY row this test deactivated (seeded defaults included), not just the suite's own.
+      if (deactivated.length > 0) {
+        await db
+          .update(cancellationOptions)
+          .set({ active: true })
+          .where(
+            inArray(
+              cancellationOptions.id,
+              deactivated.map((r) => r.id),
+            ),
+          );
+      }
+    }
+  });
+
+  // --- 017 — allowedSourceStatuses (§18 Dispatcher "Limited") + the options read model -----------
+
+  it("cancels a received and a confirmed trip when allowedSourceStatuses covers the dispatch phase", async () => {
+    for (const status of ["received", "confirmed"] as const) {
+      const tripId = await insertTrip(status);
+      const detail = await cancelTrip(tripId, validInput(), actorId, {
+        allowedSourceStatuses: DISPATCH_PHASE_TRIP_STATUSES,
+      });
+      expect(detail.currentStatus).toBe("cancelled");
+    }
+  });
+
+  it("rejects an in_transit trip with NOT_CANCELLABLE_BY_ROLE under the dispatch-phase limit — but cancels it without the limit", async () => {
+    const tripId = await insertTrip("in_transit");
+    await expect(
+      cancelTrip(tripId, validInput(), actorId, {
+        allowedSourceStatuses: DISPATCH_PHASE_TRIP_STATUSES,
+      }),
+    ).rejects.toMatchObject({ code: "NOT_CANCELLABLE_BY_ROLE" });
+
+    // The same trip remains untouched and cancellable by an unrestricted caller (admin/ops manager).
+    const detail = await cancelTrip(tripId, validInput(), actorId);
+    expect(detail.currentStatus).toBe("cancelled");
+  });
+
+  it("queryCancellationOptions returns ACTIVE rows of both kinds, ordered, and omits inactive rows", async () => {
+    // An inactive row that must NOT be served.
+    const inactive = await db
+      .insert(cancellationOptions)
+      .values({
+        kind: "reason",
+        code: code("inactive_reason"),
+        labelPt: "Inativo (teste)",
+        active: false,
+      })
+      .returning();
+    createdOptionIds.push(inactive[0]!.id);
+
+    const items = await queryCancellationOptions();
+    const codes = items.map((i) => i.code);
+    expect(codes).toContain(reasonCode);
+    expect(codes).toContain(billingImpactCode);
+    expect(codes).not.toContain(inactive[0]!.code);
+    // Ordered kind, then sort_order (the dialog renders the lists as served).
+    const kinds = items.map((i) => i.kind);
+    expect([...kinds].sort()).toEqual(kinds);
+    for (const kind of ["reason", "billing_impact"] as const) {
+      const sorts = items.filter((i) => i.kind === kind).map((i) => i.sortOrder);
+      expect([...sorts].sort((a, b) => a - b)).toEqual(sorts);
     }
   });
 });

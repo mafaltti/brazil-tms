@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { can } from "@brazil-tms/shared";
 import { verifySession } from "@/lib/auth/session";
+import { cancelScopeForRole } from "@/lib/trips/cancel-scope";
 import { getTripFilterOptions } from "@/lib/trips/trips-read";
 import { DispatchBoard } from "@/components/trips/dispatch/dispatch-board";
 
@@ -20,6 +21,8 @@ export default async function DispatchPage() {
 
   const t = await getTranslations("Dispatch");
   const resourceOptions = await getTripFilterOptions();
+  // 017 — reveal the per-row cancel action per §18 (fleet_coordinator assigns but cannot cancel).
+  const cancelScope = cancelScopeForRole(session.user.role);
 
   return (
     <div className="space-y-4">
@@ -27,7 +30,7 @@ export default async function DispatchPage() {
         <h1 className="text-2xl font-semibold">{t("title")}</h1>
         <p className="text-muted-foreground">{t("subtitle")}</p>
       </header>
-      <DispatchBoard resourceOptions={resourceOptions} />
+      <DispatchBoard resourceOptions={resourceOptions} cancelScope={cancelScope} />
     </div>
   );
 }

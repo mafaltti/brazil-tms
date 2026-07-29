@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { TripFilterOptions } from "@/lib/trips/trips-read";
+import { useFilterOptions } from "@/lib/trips/client";
 import { cn } from "@/lib/utils";
 import { ReportFilters, type ReportFiltersValue } from "@/components/reports/report-filters";
 import { SlaReport } from "@/components/reports/sla-report";
@@ -27,7 +28,9 @@ export function reportSearch(value: ReportFiltersValue): string {
   return params.toString();
 }
 
-export function ReportsClient({ options }: { options: TripFilterOptions }) {
+export function ReportsClient({ options: initialOptions }: { options: TripFilterOptions }) {
+  // 019 — keep the lists fresh on an open tab (60s poll + focus refetch); server data seeds it.
+  const options = useFilterOptions(initialOptions);
   const t = useTranslations("Reports");
   const [tab, setTab] = useState<Tab>("sla");
   const [filters, setFilters] = useState<ReportFiltersValue>({});
