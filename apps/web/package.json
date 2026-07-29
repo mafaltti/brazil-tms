@@ -11,6 +11,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@brazil-tms/db": "workspace:*",
     "@brazil-tms/shared": "workspace:*",
     "@hookform/resolvers": "^3.9.0",
@@ -26,6 +27,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "drizzle-orm": ">=0.36.0",
+    "exceljs": "^4.4.0",
     "lucide-react": "^0.460.0",
     "luxon": "^3.5.0",
     "next": "^15.2.3",

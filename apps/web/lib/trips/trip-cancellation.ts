@@ -1,2 +1,6 @@
 import "server-only";
-export { cancelTrip } from "@brazil-tms/db";
+export {
+  cancelTrip,
+  queryCancellationOptions,
+  type CancellationOptionItem,
+} from "@brazil-tms/db";

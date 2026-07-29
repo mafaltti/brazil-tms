@@ -13,8 +13,11 @@ import { testAccounts } from "./test-config";
  * Coverage notes (documented, not silently dropped):
  *  - `upload_documents` has no seeded non-holder (all seven internal roles except executive_viewer hold
  *    it; executive_viewer is not seeded), so its negative case can't be exercised here.
- *  - `cancel_trip` / `resolve_dispute` are enforced CONDITIONALLY inside the status-transition handler
- *    (not a top-level `requirePermission`), so they're covered by the execution/cancellation specs.
+ *  - `resolve_dispute` is enforced CONDITIONALLY inside the status-transition handler (not a
+ *    top-level `requirePermission`), so it's covered by the execution specs.
+ *  - `cancel_trip` (017): enforced top-level at the DEDICATED endpoints (`/cancel`,
+ *    `/cancellation-options`) — rows below; the generic `/status` route refuses `cancelled` outright
+ *    (USE_CANCELLATION_ENDPOINT, covered in trip-cancellation.spec.ts).
  */
 
 const FAKE = "00000000-0000-4000-8000-000000000000";
@@ -49,6 +52,10 @@ const CASES: Case[] = [
   { key: "assign_resources", name: "assign resources", method: "POST", path: `/api/trips/${FAKE}/assignment`, holder: "dispatcher", nonHolder: "finance" },
   { key: "assign_resources", name: "confirm assignment", method: "POST", path: `/api/trips/${FAKE}/assignment/confirm`, holder: "dispatcher", nonHolder: "finance" },
   { key: "update_trip_status", name: "status transition", method: "POST", path: `/api/trips/${FAKE}/status`, holder: "dispatcher", nonHolder: "finance" },
+  // 017 — cancel_trip: admin/ops_manager/dispatcher hold it; fleet_coordinator assigns but must NOT
+  // cancel; finance must not even read the option lists.
+  { key: "cancel_trip", name: "cancel trip", method: "POST", path: `/api/trips/${FAKE}/cancel`, holder: "dispatcher", nonHolder: "fleetCoord" },
+  { key: "cancel_trip", name: "list cancellation options", method: "GET", path: "/api/cancellation-options", holder: "opsManager", nonHolder: "finance" },
   { key: "update_trip_status", name: "add trip event", method: "POST", path: `/api/trips/${FAKE}/events`, holder: "dispatcher", nonHolder: "finance" },
   { key: "create_exceptions", name: "create exception", method: "POST", path: `/api/trips/${FAKE}/exceptions`, holder: "dispatcher", nonHolder: "finance" },
   { key: "resolve_exceptions", name: "edit exception", method: "PATCH", path: `/api/exceptions/${FAKE}`, holder: "dispatcher", nonHolder: "finance" },

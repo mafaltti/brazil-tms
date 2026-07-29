@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { TripFilterOptions } from "@brazil-tms/db";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { TripStatusBadge } from "@/components/trips/trip-status-badge";
 import { exportHref } from "@/lib/trips/client";
 import { DEFAULT_TRIP_VIEWS } from "@/lib/trips/views";
@@ -38,7 +39,10 @@ type FilterValue = string | string[] | undefined;
  * their option label is derived `O → D` from the locations code map. Feature 006 adds the assignment
  * filters (assigned tri-state + assigned driver/vehicle/carrier), sourced from the same server-loaded
  * `options` (now carrying the active fleet lists). Feature 007 adds the SLA-risk filter + the "At
- * risk" view (from `DEFAULT_TRIP_VIEWS`).
+ * risk" view (from `DEFAULT_TRIP_VIEWS`). Feature 018 (issue #25): the three assigned-RESOURCE
+ * filters (driver/vehicle/carrier) are searchable comboboxes — type/paste to find; "Todos" is the
+ * pinned clear item mapping to the unset (`__all__`) state. The other dropdowns stay plain Selects
+ * (clarification 2026-07-27).
  */
 export function TripFilters({
   query,
@@ -57,6 +61,7 @@ export function TripFilters({
   const tCommon = useTranslations("Common");
   const tVehicle = useTranslations("VehicleTypes");
   const tSla = useTranslations("Sla.status");
+  const tDispatch = useTranslations("Dispatch");
 
   // Local search box state, synced to the URL `q` param on submit (Enter / blur).
   const [q, setQ] = useState(query.q ?? "");
@@ -315,65 +320,49 @@ export function TripFilters({
             </Select>
           </div>
 
-          {/* 006 — assigned-resource filters (sourced from the server-loaded active fleet lists) */}
+          {/* 006 — assigned-resource filters (server-loaded active fleet lists); 018 — searchable
+              comboboxes (type/paste to find; "Todos" = pinned clear item → unset). */}
           <div className="space-y-1.5">
-            <Label>{t("board.filterDriver")}</Label>
-            <Select
+            <Label htmlFor="filter-driver">{t("board.filterDriver")}</Label>
+            <SearchableSelect
+              id="filter-driver"
               value={query.driverId ?? ""}
-              onValueChange={(v) => setFilters({ driverId: v === "__all__" ? undefined : v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("board.all")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">{t("board.all")}</SelectItem>
-                {options.drivers.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={options.drivers}
+              onChange={(v) => setFilters({ driverId: v || undefined })}
+              placeholder={t("board.all")}
+              emptyText={tDispatch("searchNoResults")}
+              clearable
+              clearLabel={t("board.all")}
+            />
           </div>
 
           <div className="space-y-1.5">
-            <Label>{t("board.filterVehicle")}</Label>
-            <Select
+            <Label htmlFor="filter-vehicle">{t("board.filterVehicle")}</Label>
+            <SearchableSelect
+              id="filter-vehicle"
               value={query.vehicleId ?? ""}
-              onValueChange={(v) => setFilters({ vehicleId: v === "__all__" ? undefined : v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("board.all")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">{t("board.all")}</SelectItem>
-                {options.vehicles.map((v) => (
-                  <SelectItem key={v.id} value={v.id}>
-                    {v.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={options.vehicles}
+              onChange={(v) => setFilters({ vehicleId: v || undefined })}
+              placeholder={t("board.all")}
+              emptyText={tDispatch("searchNoResults")}
+              mode="plate"
+              clearable
+              clearLabel={t("board.all")}
+            />
           </div>
 
           <div className="space-y-1.5">
-            <Label>{t("board.filterCarrier")}</Label>
-            <Select
+            <Label htmlFor="filter-carrier">{t("board.filterCarrier")}</Label>
+            <SearchableSelect
+              id="filter-carrier"
               value={query.carrierId ?? ""}
-              onValueChange={(v) => setFilters({ carrierId: v === "__all__" ? undefined : v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t("board.all")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">{t("board.all")}</SelectItem>
-                {options.carriers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={options.carriers}
+              onChange={(v) => setFilters({ carrierId: v || undefined })}
+              placeholder={t("board.all")}
+              emptyText={tDispatch("searchNoResults")}
+              clearable
+              clearLabel={t("board.all")}
+            />
           </div>
 
           <div className="space-y-1.5">

@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
 import { createDriverSchema, type CreateDriverInput } from "@brazil-tms/shared";
 import { Input } from "@/components/ui/input";
+import { DocumentReadButton } from "@/components/master-data/document-read-button";
 import { EntityFormShell, Field } from "@/components/master-data/entity-form";
 import {
   ExpiryDateField,
@@ -68,6 +69,25 @@ export function DriverForm({
       onCancel={onCancel}
       onSubmit={handleSubmit((values) => onSubmit(values))}
     >
+      {/* 021 (issue #29) — CNH read prefills the mapped fields for REVIEW; saving stays manual. */}
+      <DocumentReadButton
+        docType="cnh"
+        fieldLabels={{
+          name: t("name"),
+          licenseNumber: t("licenseNumber"),
+          licenseCategory: t("licenseCategory"),
+          licenseExpiry: t("licenseExpiry"),
+        }}
+        onExtracted={(fields) => {
+          for (const [key, value] of Object.entries(fields)) {
+            setValue(key as "name" | "licenseNumber" | "licenseCategory" | "licenseExpiry", value, {
+              shouldDirty: true,
+              shouldValidate: true,
+            });
+          }
+        }}
+      />
+
       <Field label={t("name")} htmlFor="name" required error={fieldMessage(errors.name)}>
         <Input id="name" {...register("name")} />
       </Field>

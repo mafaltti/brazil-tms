@@ -4,6 +4,7 @@ import { can } from "@brazil-tms/shared";
 import { verifySession } from "@/lib/auth/session";
 import { ControlTowerTable } from "@/components/trips/control-tower-table";
 import { AlertSurface } from "@/components/alerts/alert-surface";
+import { cancelScopeForRole } from "@/lib/trips/cancel-scope";
 import { getTripFilterOptions } from "@/lib/trips/trips-read";
 
 /**
@@ -26,6 +27,8 @@ export default async function TripsPage() {
   const t = await getTranslations("Trips");
   const filterOptions = await getTripFilterOptions();
   const canAssign = can(session.user.role, "assign_resources");
+  // 017 — reveal the per-row cancel action per §18 (any | dispatch_phase | none); BFF re-enforces.
+  const cancelScope = cancelScopeForRole(session.user.role);
 
   return (
     <div className="space-y-4">
@@ -34,7 +37,11 @@ export default async function TripsPage() {
         <p className="text-muted-foreground">{t("subtitle")}</p>
       </header>
       <AlertSurface />
-      <ControlTowerTable filterOptions={filterOptions} canAssign={canAssign} />
+      <ControlTowerTable
+        filterOptions={filterOptions}
+        canAssign={canAssign}
+        cancelScope={cancelScope}
+      />
     </div>
   );
 }

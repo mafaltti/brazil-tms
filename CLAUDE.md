@@ -70,7 +70,7 @@ Start with two packages (`shared`, `db`); add more only with justification.
 Active feature plan: `specs/022-driver-cpf-field/plan.md` (Driver CPF Replaces E-mail — issue #28 [0005]).
 **Contained swap slice**: o form do motorista troca E-mail por CPF. `cpfSchema` no shared (strip pontuação → 11 dígitos,
 espelho do `cnpjSchema`; opcional/`blankable`, sem dígito verificador — postura R7), `driverBase.email` → `cpf`. DB: coluna
-`cpf` nova (migração 0009, só ADD COLUMN); a coluna `email` fica **DORMENTE** — TRAP: ela PERMANECE mapeada no Drizzle
+`cpf` nova (migração 0010, só ADD COLUMN); a coluna `email` fica **DORMENTE** — TRAP: ela PERMANECE mapeada no Drizzle
 (`packages/db/schema/drivers.ts`, comentada como dormant) senão o próximo `drizzle-kit generate` emite `DROP COLUMN`
 destruindo dados reais de produção; ela sai apenas de Zod/DTO/serviço/form/i18n. Serviço: `DriverDto`/insert/update
 field-list `email` → `cpf` (audit pega `cpf` genericamente). UI: `driver-form.tsx` (mesmo slot do grid) +
