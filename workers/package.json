@@ -1,0 +1,29 @@
+{
+  "name": "@brazil-tms/workers",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts",
+    "dev": "tsx watch index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@brazil-tms/db": "workspace:*",
+    "@brazil-tms/shared": "workspace:*",
+    "csv-parse": "^6.2.1",
+    "dotenv": "^16.6.1",
+    "drizzle-orm": "^0.45.2",
+    "exceljs": "^4.4.0",
+    "luxon": "^3.7.2",
+    "pg-boss": "^12.18.2",
+    "postgres": "^3.4.9"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.7.1",
+    "@types/node": "^22.19.19",
+    "tsx": "^4.22.3",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}

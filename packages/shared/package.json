@@ -1,0 +1,28 @@
+{
+  "name": "@brazil-tms/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./auth/permissions": "./src/auth/permissions.ts",
+    "./formatting": "./src/formatting.ts",
+    "./schemas/auth": "./src/schemas/auth.ts",
+    "./schemas/admin-user": "./src/schemas/admin-user.ts",
+    "./schemas/import": "./src/schemas/import.ts",
+    "./import": "./src/import/index.ts",
+    "./audit/actions": "./src/audit/actions.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "luxon": "^3.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/luxon": "^3.4.2"
+  }
+}

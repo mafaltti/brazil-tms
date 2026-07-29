@@ -1,0 +1,37 @@
+# Production reverse proxy template — single public entrypoint for the TMS.
+# Fronts the Next.js app (BFF + UI) and the Supabase Auth/Storage API on one domain.
+# Replace {$APP_DOMAIN} and enable automatic HTTPS in production.
+
+{$APP_DOMAIN:localhost} {
+	# CVE-2025-29927: never let a client-supplied middleware-subrequest header reach Next.js.
+	# The DAL (requireAuth) is the real security boundary; this is defense-in-depth.
+	request_header -x-middleware-subrequest
+
+	# Supabase Auth (GoTrue).
+	handle_path /auth/v1/* {
+		reverse_proxy auth:9999
+	}
+
+	# Supabase Storage (later features).
+	handle_path /storage/v1/* {
+		reverse_proxy storage:5000
+	}
+
+	# PostgREST is intentionally NOT proxied — see STACK §5.1/§5.2. The BFF owns all data access.
+
+	# Trip import upload (feature 004, R4): CSV/XLSX up to the Storage limit. App Router has no
+	# per-route bodySizeLimit, so the cap is raised here at the proxy for the import endpoints; the
+	# upload route streams the original file straight to Supabase Storage.
+	@imports path /api/imports /api/imports/*
+	handle @imports {
+		request_body {
+			max_size 50MB
+		}
+		reverse_proxy web:3000
+	}
+
+	# Everything else → the Next.js app container.
+	handle {
+		reverse_proxy web:3000
+	}
+}

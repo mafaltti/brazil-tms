@@ -1,0 +1,29 @@
+# Supabase API gateway (dev + prod). Exposes ONLY GoTrue and Storage — never PostgREST.
+# Listens on :8000 so NEXT_PUBLIC_SUPABASE_URL=http://localhost:8000 reaches /auth/v1/* .
+{
+	admin off
+	auto_https off
+}
+
+:8000 {
+	# CVE-2025-29927: strip any client-supplied Next.js middleware bypass header inbound.
+	request_header -x-middleware-subrequest
+
+	# GoTrue (Auth) — supabase-js calls ${url}/auth/v1/*, GoTrue serves those routes at root.
+	handle_path /auth/v1/* {
+		reverse_proxy auth:9999
+	}
+
+	# Storage (feature 004 — import original file + error report). supabase-js calls
+	# ${url}/storage/v1/*; storage-api serves those routes at root. Private buckets only; downloads go
+	# through the BFF as short-lived signed URLs (never public object URLs).
+	handle_path /storage/v1/* {
+		reverse_proxy storage:5000
+	}
+
+	# PostgREST is intentionally absent. Do NOT add a /rest/v1 route (STACK §5.1/§5.2):
+	# all app-schema access goes through the BFF over a direct, server-only Postgres connection.
+	handle {
+		respond "Not found" 404
+	}
+}

@@ -238,6 +238,8 @@ The MVP should include:
 - User roles and permissions.
 - Audit trail for critical changes.
 - Portuguese (pt-BR) UI with i18n scaffolding from day one (see 21.6).
+- Internal agregados freight rate lookup ("Tabela de Fretes") with spreadsheet
+  replace-by-upload (added 2026-07-13, see 13.14 and 30).
 
 ### 10.2 Post-MVP Scope
 
@@ -287,9 +289,9 @@ System checks:
 - Trip is not a duplicate.
 - Trip does not conflict with already accepted customer updates.
 
-Validation outcomes:
+Validation outcomes (per imported row; see §11.1):
 
-- Valid: trip can move to planning or assignment.
+- Valid: the row creates/updates a trip born `Received` — itself dispatchable, ready for assignment (slice 015; there is no separate trip-level "Validated" hop).
 - Warning: trip can proceed but requires user attention.
 - Error: trip cannot proceed until corrected.
 
@@ -365,9 +367,7 @@ The system should support the following standard statuses:
 
 | Status | Meaning | Typical Owner |
 |---|---|---|
-| Received | Trip imported or manually created | Operations |
-| Validation Error | Trip has blocking data issue | Operations |
-| Validated | Trip data is complete enough to execute | Operations |
+| Received | Trip imported or manually created; the first **dispatchable** status | Operations |
 | Assigned | Driver, vehicle, and/or carrier assigned | Dispatcher |
 | Confirmed | Assignment confirmed for execution | Dispatcher |
 | At Origin | Vehicle arrived at pickup location | Control Tower |
@@ -392,10 +392,8 @@ Transitions not listed are invalid and must be rejected by the status machine (S
 
 | From | Allowed next | Trigger / owner |
 |---|---|---|
-| Received | Validated, Validation Error, Cancelled | System validation / Operations |
-| Validation Error | Received | Operations (after correction) |
-| Validated | Assigned, Cancelled | Dispatcher |
-| Assigned | Confirmed, Validated (unassign), Cancelled | Dispatcher |
+| Received | Assigned, Cancelled | Dispatcher / Operations |
+| Assigned | Confirmed, Received (unassign), Cancelled | Dispatcher |
 | Confirmed | At Origin, Cancelled | Control Tower |
 | At Origin | Loading, In Transit, Cancelled | Control Tower |
 | Loading | Loaded, Cancelled | Control Tower |
@@ -416,7 +414,8 @@ Notes:
 - **Loading** and **Unloading** are optional sub-states; operations may skip directly (At Origin → In Transit, At Destination → Unloaded).
 - **Cancelled** is allowed from any non-terminal status before **Completed**, and requires the Section 19.5 cancellation data.
 - **Disputed** records the status it was entered from so it can return there on resolution; dispute detail is tracked on the Billing Item (Section 14).
-- A **Warning** validation outcome (11.2) is not a status — it is a flag on a `Received`/`Validated` trip that needs attention but does not block progression.
+- A **Warning** validation outcome (11.2) is not a status — it is a flag on a `Received` trip that needs attention but does not block progression.
+- **Slice 015** collapsed the three former validation states (`Received`, `Validation Error`, `Validated`) into a single `Received`, which is now the first dispatchable status (the redundant trip-level validate hop was removed; import already validates per row). This supersedes slice 014's born-`Validated` decision — imported trips are born `Received`. See §30.
 
 ### 12.2 SLA Status
 
@@ -498,9 +497,9 @@ MVP computes SLA status from the planned pickup window, planned delivery window,
 | ID | Requirement | Priority |
 |---|---|---|
 | RES-001 | Users can create and edit driver records. | MVP |
-| RES-002 | Driver records include name, phone, license category, document expiry dates, carrier/employer, status, and notes. | MVP |
+| RES-002 | Driver records include name, phone, CPF, license category, document expiry dates, carrier/employer, status, and notes. | MVP |
 | RES-003 | Users can create and edit vehicle records. | MVP |
-| RES-004 | Vehicle records include plate, type, capacity, owner/carrier, document expiry dates, tracker identifier if available, and status. | MVP |
+| RES-004 | Vehicle records include plate, type, ANTT/Renavam/chassis if available, capacity, owner/carrier, document expiry dates, tracker identifier if available, and status. | MVP |
 | RES-005 | Users can create and edit trailer records where applicable. | MVP |
 | RES-006 | Users can create and edit carrier/subcontractor records. | MVP |
 | RES-007 | System tracks resource active, inactive, unavailable, maintenance, and blocked statuses. | MVP |
@@ -593,6 +592,22 @@ MVP computes SLA status from the planned pickup window, planned delivery window,
 | AUTH-004 | Customer Viewer users can only access trips belonging to their customer. | Later |
 | AUTH-005 | System records audit history for critical actions. | MVP |
 | AUTH-006 | System supports single sign-on. | Later |
+
+### 13.14 Freight Rate Lookup (Agregados)
+
+Internal spot-price table for agregado (owner-operator) freight, maintained as a
+spreadsheet outside the system and replaced wholesale on upload. Unrelated to
+customer lane pricing (LANE-004) and to customer trip intake (13.3). Added
+2026-07-13 (see 30); implemented by feature slice 016.
+
+| ID | Requirement | Priority |
+|---|---|---|
+| RATE-LOOKUP-001 | System maintains an internal freight rate table: route (origin UF/city, destination UF/city), distance (km), vehicle type, one-way price, return price, and notes. | MVP |
+| RATE-LOOKUP-002 | Internal users can search and filter rates by origin UF/city, destination UF/city and one-way price range, with sorting by price and distance. | MVP |
+| RATE-LOOKUP-003 | Results display distance, vehicle type, both prices and notes in pt-BR with BRL formatting; missing values render as "—". | MVP |
+| RATE-LOOKUP-004 | Authorized users (Admin, Finance) replace the entire table by uploading the standard spreadsheet; the replace is atomic and a rejected file changes nothing, reporting row-level errors. | MVP |
+| RATE-LOOKUP-005 | Every successful import is recorded (file name, user, timestamp, counts) and appears in the audit trail. | MVP |
+| RATE-LOOKUP-006 | Freight rate data is restricted to internal roles and never exposed on customer-facing surfaces. | MVP |
 
 ## 14. Data Model
 
@@ -703,13 +718,14 @@ Fields:
 - Driver ID.
 - Name.
 - Phone.
-- Email if available.
+- CPF if available.
 - License number.
 - License category.
 - License expiration date.
 - Employer or carrier.
 - Status.
 - Notes.
+- Attached documents (upload history — e.g. digital license, photocheck).
 
 #### Vehicle
 
@@ -718,6 +734,9 @@ Fields:
 - Vehicle ID.
 - Plate.
 - Vehicle type.
+- ANTT (RNTRC) number if available.
+- Renavam if available.
+- Chassis (VIN) if available.
 - Capacity.
 - Owner.
 - Carrier.
@@ -726,6 +745,7 @@ Fields:
 - Document expiration dates.
 - Status.
 - Notes.
+- Attached documents (upload history — e.g. digital registration, insurance).
 
 #### Trailer
 
@@ -1166,6 +1186,24 @@ Required features:
 - SLA rules.
 - Rate tables.
 
+### 15.13 Freight Rates (Tabela de Fretes)
+
+Purpose:
+
+- Look up agregado spot prices by route without opening the spreadsheet.
+
+Required features:
+
+- Filters: origin UF/city, destination UF/city, one-way price range.
+- Columns: origin, destination, km, vehicle type, one-way price, return price, notes.
+- Sorting by one-way price and by distance (missing values last).
+- Spreadsheet upload (Admin, Finance) that atomically replaces the whole table,
+  with row-level errors on rejection.
+- Empty states for "table not loaded yet" and "no rates match the filters".
+
+The navigation label is "Tabela de Fretes" — "Rotas" already names the Lanes screen
+(15.12 master data).
+
 ## 16. UX Requirements
 
 The product should feel like an operational control system, not a marketing website.
@@ -1240,6 +1278,8 @@ Recommended permission matrix:
 | Edit rates | Yes | No | No | No | No | Yes | No | No |
 | Export billing | Yes | No | No | No | No | Yes | No | No |
 | Manage users | Yes | No | No | No | No | No | No | No |
+| View freight rate table (13.14) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | No |
+| Import freight rate table (13.14) | Yes | No | No | No | No | Yes | No | No |
 
 ## 19. Business Rules
 
@@ -1639,3 +1679,9 @@ Decisions made to bring this PRD to execution-readiness. Override any of these i
 - **Permissions** (Section 18): added Cancel, Mark Completed, Mark Billing Ready, Resolve dispute, Delete/Archive.
 - **Localization** (21.6): i18n from day one; MVP UI in pt-BR.
 - **SLA milestone data**: MVP SLA computed from pickup/delivery windows + assignment/confirmation cutoffs; per-milestone planned times deferred to Input #2.
+- **Collapse validation statuses** (slice 015, 2026-06-07): the three early validation states — `Received`, `Validation Error`, `Validated` — are collapsed into a single `Received`, which becomes the first **dispatchable** status (§12, §12.1). Import already validates every row (only Valid/Warning rows are applied), so a separate trip-level validate hop carried no information. The active status machine drops from 18 to 16 values; `Assigned`/`Confirmed` and everything from `Confirmed` onward are unchanged (the confirm step and the confirmation-cutoff SLA are out of scope). This **supersedes slice 014's born-`Validated`** decision: imported trips are now born `Received`, and assign/unassign run `Received → Assigned` / `Assigned → Received`. The `trip_status` DB enum keeps all 18 physical members (Postgres has no `DROP VALUE`); the two removed values become **dormant** (retained only for immutable `trip_events` history) and a one-time data migration backfills any live trip off them. The separate `import_batch_status` enum (which also has `validated`) is untouched.
+- **Freight rate lookup (slice 016, 2026-07-13)**: NEW scope added on the product owner's request — an internal agregados spot-price table ("Tabela de Fretes", 13.14 / 15.13) searchable by route and one-way price, replaced wholesale by uploading the standard spreadsheet (Admin + Finance, mirroring the "Edit rates" precedent in Section 18). Deliberately separate from customer lane pricing (LANE-004): lane rates are contracted per customer; this table is agregado spot pricing maintained outside the system. Vehicle types are free-form labels from the sheet (not the fleet vehicle-type enum) so new labels never require a migration. The spreadsheet holds commercial data and must never enter the (public) repository — tests and seeds are synthetic.
+- **Trip cancellation exposure & Dispatcher "Limited" (slice 017, 2026-07-27)**: the §18 `Cancel trip` action ships in the UI on three surfaces — Trip Detail, the Dispatch board row, and the Control Tower table row — all driving the single justified flow (§19.5: reason + responsible party + billing impact; user and timestamp recorded server-side). The Dispatcher's **"Limited"** cell is defined as: a Dispatcher may cancel only trips still in the **dispatch phase** (`Received`, `Assigned`, `Confirmed`); Admin and Ops Manager may cancel any legally cancellable trip (§12.1). Cancellation is reachable ONLY through the dedicated cancellation flow — the generic status-update path refuses `Cancelled` as a target, closing a §19.5 bypass. Default pt-BR cancellation **reason** options are seeded as labeled scaffolding (billing impacts were already seeded per §19.5); the final lists remain config-driven with business sign-off pending.
+- **Driver CPF replaces e-mail** (slice 022, issue #28, 2026-07-28): the driver record captures **CPF** (optional, 11 digits, format check only — same posture as CNPJ) instead of e-mail, which the operation never used. The DB `email` column becomes **dormant** (kept with its data for history; no product surface reads it); a future cleanup migration may drop it once the business confirms. CPF uniqueness/check-digit validation deferred until the business asks.
+- **Vehicle registry identifiers** (slice 023, issue #30, 2026-07-28): vehicle records capture **ANTT (RNTRC)**, **Renavam** and **Chassis (VIN)** — optional, non-unique (the plate stays the only unique key). Validation matches each format's certainty (the R7 posture): Renavam = 9–11 digits after stripping punctuation; chassis = 17 standard-VIN characters normalized uppercase; ANTT stays free text (its format varies by era/category). The vehicle form groups Placa/Tipo/Renavam/ANTT and shrinks Capacidade to a half-width cell (the issue's space request). Trailers (which legally also carry these identifiers) are deferred until the business asks.
+- **Registry attachments** (slice 025, issue #32, 2026-07-28): driver and vehicle records gain an **append-only document history** ("Documentos" tab on the edit pages) — uploads such as the digital license or photocheck, stored in the private documents bucket with metadata in a dedicated `resource_documents` table (separate from the trip-proof `documents` domain, whose verification/billing semantics do not apply). Document types are free text with UI suggestions (a configurable type master is future hardening); files follow the 008 posture (PDF/JPG/PNG ≤ ~10 MB, validated before storing, signed-URL downloads); everything gates on the fleet-data permission and every upload is audited. No delete/replace: history is the requirement. Trailers deferred until asked.

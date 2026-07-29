@@ -1,0 +1,160 @@
+# Self-hosted Supabase for Brazil Transports TMS — Postgres + GoTrue (Auth) ONLY for feature 001.
+#
+# Validated working config (stood up + e2e-verified locally). Notes:
+#  - Plain Postgres + an initdb script (initdb/00-auth-init.sh) that creates the `auth` schema,
+#    required extensions, and the `supabase_auth_admin` role (search_path=auth, password tracks
+#    POSTGRES_PASSWORD). The supabase/postgres image pre-bakes a partial auth schema that conflicts
+#    with GoTrue's migrations.
+#  - GoTrue is pinned to v2.151.0: a later MFA "phone" migration aborts GoTrue's whole migration
+#    batch on a from-scratch Postgres. [VERIFY AT SETUP] when upgrading GoTrue.
+#  - GoTrue connects as supabase_auth_admin (search_path=auth) so its UNQUALIFIED queries resolve to
+#    the auth schema. Our app connects as `postgres` (search_path public) — cleanly separated.
+#  - Mailpit catches invite/recovery emails locally (UI at http://localhost:8025).
+#  - PostgREST is intentionally NOT run/exposed (STACK §5): the BFF reaches Postgres directly via
+#    Drizzle (server-only DATABASE_URL). Storage is provisioned by the first feature that needs proof/
+#    document upload — NOT feature 001 — so it is omitted here.
+#
+# Copy .env.example -> .env and fill secrets before `docker compose up`.
+
+name: brazil-tms-supabase
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    ports:
+      - "${SUPABASE_DB_PORT:-5432}:5432" # server-only in prod; bound for local Drizzle migrate/seed in dev
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "${POSTGRES_DB:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  auth:
+    image: supabase/gotrue:v2.151.0
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: ${API_EXTERNAL_URL:-http://localhost:8000}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      GOTRUE_SITE_URL: ${SITE_URL:-http://localhost:3000}
+      GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS:-http://localhost:3000/**}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_AUD: authenticated
+      # --- Session policy (FR-003a; research §4) ---
+      GOTRUE_JWT_EXP: "3600" # 1h access token; @supabase/ssr refreshes ~60s before expiry (rolling)
+      GOTRUE_SECURITY_REFRESH_TOKEN_ROTATION_ENABLED: "true"
+      GOTRUE_SECURITY_REFRESH_TOKEN_REUSE_INTERVAL: "10"
+      GOTRUE_SESSIONS_INACTIVITY_TIMEOUT: "8h" # [VERIFY AT SETUP] idle window; app-layer fallback if ineffective
+      GOTRUE_SESSIONS_TIMEBOX: "720h" # 30-day absolute max
+      # --- Provisioning: internal TMS, admin-only, no public sign-up (FR-001) ---
+      GOTRUE_DISABLE_SIGNUP: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      # --- SMTP (invite + forgot-password; research §6). Defaults to the local Mailpit catcher. ---
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-mailpit}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-1025}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-mailpit}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-mailpit}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-noreply@braziltransports.com.br}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-Brazil Transports TMS}
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/set-password
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/set-password
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/set-password
+    expose:
+      - "9999" # reachable only inside the compose network; public access is via the gateway
+
+  storage:
+    # Supabase Storage (feature 004 — first feature to need object upload: import original file +
+    # generated error report). File backend (no S3) for self-hosting; image transforms disabled (no
+    # imgproxy needed). Connects to Postgres as the superuser so it can install its roles + the
+    # `storage` schema on first boot (DB_INSTALL_ROLES). Private buckets only; access is server-mediated
+    # via signed URLs issued by the BFF (Constitution IV — the gateway never exposes public object URLs).
+    image: supabase/storage-api:v1.11.13
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      DB_INSTALL_ROLES: "true"
+      PGOPTIONS: "-c search_path=storage,public"
+      FILE_SIZE_LIMIT: "52428800"
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+    volumes:
+      - storage-data:/var/lib/storage
+    expose:
+      - "5000" # reachable only inside the compose network; public access is via the gateway
+
+  worker:
+    # Feature 004 — the activated import worker (pg-boss). The sanctioned one-app-one-worker process:
+    # heavy parse/validate/dedup/confirm runs here, never in BFF request handlers (STACK §2/§6.3).
+    # Reaches Postgres directly and Supabase Storage via the gateway. (The Next `web` app container is
+    # a separate deployment artifact; in dev the app runs via `pnpm dev` and the worker via
+    # `pnpm --filter @brazil-tms/workers start`.) Disabled-by-default in dev: start with
+    # `docker compose up worker` once the image is built.
+    build:
+      context: ../..
+      dockerfile: infra/worker.Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      storage:
+        condition: service_started
+      gateway:
+        condition: service_started
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}
+      SUPABASE_URL: http://gateway:8000
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      IMPORT_BUCKET: imports
+      # Feature 007 — SLA sweep cron (every 5 min by default). The first scheduled worker job.
+      SLA_SWEEP_CRON: ${SLA_SWEEP_CRON:-*/5 * * * *}
+      # Feature 008 — documents + billing-export buckets, upload size cap, and the second scheduled job.
+      DOCUMENTS_BUCKET: documents
+      EXPORTS_BUCKET: billing-exports
+      DOCUMENT_MAX_BYTES: ${DOCUMENT_MAX_BYTES:-10485760}
+      DOCUMENT_CHECKS_CRON: ${DOCUMENT_CHECKS_CRON:-*/5 * * * *}
+
+  mailpit:
+    # Dev mail catcher so invite/recovery emails don't hard-fail without real SMTP. UI: :8025.
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+
+  gateway:
+    # Public Supabase API surface: /auth/v1 (GoTrue) + /storage/v1 (Storage, feature 004). No /rest/v1.
+    image: caddy:2.8-alpine
+    depends_on:
+      - auth
+      - storage
+    restart: unless-stopped
+    ports:
+      - "8000:8000" # NEXT_PUBLIC_SUPABASE_URL=http://localhost:8000 (quickstart.md)
+    volumes:
+      - ../caddy/gateway.Caddyfile:/etc/caddy/Caddyfile:ro
+
+volumes:
+  db-data:
+  storage-data:

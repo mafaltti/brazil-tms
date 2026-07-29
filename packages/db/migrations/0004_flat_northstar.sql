@@ -1,0 +1,1 @@
+CREATE INDEX "trips_pickup_start_idx" ON "trips" USING btree ("planned_pickup_window_start");

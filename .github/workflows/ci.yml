@@ -1,0 +1,55 @@
+name: CI
+
+# Quality gates from docs/DELIVERY-WORKFLOW.md (§Quality Gates): lint + typecheck + build + test.
+# Runs on every PR to dev/main and on pushes to those branches. The core checks need no external
+# services — the Drizzle client connects lazily, the DB-backed Vitest integration tests self-skip
+# when DATABASE_URL is unset, and `next build` does not touch the database.
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+# Cancel superseded runs on the same ref to save Actions minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: "lint · typecheck · build · test"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pinned version from package.json `packageManager` (pnpm@10.23.0).
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+        env:
+          # Client env is read at runtime, not build time, but provide harmless placeholders so a
+          # build can never fail on a missing NEXT_PUBLIC_* value. No real secrets in CI.
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:8000
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-anon-key
+
+      - name: Test (Vitest — DB-backed integration tests skip without DATABASE_URL)
+        run: pnpm test

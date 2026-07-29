@@ -1,0 +1,4 @@
+id_viagem,origem,destino,janela_coleta_inicio,janela_coleta_fim,tipo_veiculo,status
+TRIP-1001,CD-SP,CD-RJ,01/06/2026 08:00,01/06/2026 12:00,truck,Planejada
+TRIP-1002,CD-SP,CD-RJ,02/06/2026 09:00,02/06/2026 13:00,carreta,Planejada
+TRIP-1003,CD-SP,CD-RJ,03/06/2026 07:30,03/06/2026 11:30,truck,Criada
