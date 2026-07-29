@@ -15,6 +15,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { AssignmentForm } from "@/components/trips/dispatch/assignment-form";
+import { CancelTripDialog } from "@/components/trips/cancel-trip-dialog";
+import { canCancelTrip, type CancelScope } from "@/lib/trips/cancel-scope";
 import { useTripBoard } from "@/lib/trips/client";
 
 /**
@@ -30,16 +32,30 @@ import { useTripBoard } from "@/lib/trips/client";
  * `scope=active` default in `buildWhere`) so it lists ONLY unassigned `received` trips — every "Atribuir"
  * it offers can succeed (`received → assigned`). The validation states were collapsed into `received`,
  * which is now the first dispatchable status (slice 015 superseded slice 014's `status=validated` queue).
+ *
+ * 017 (issue #24): each row also offers "Cancelar viagem" for `cancelScope` holders (the queue is all
+ * `received` ⊂ dispatch phase, so any non-`none` scope qualifies) — the shared CancelTripDialog; a
+ * cancelled trip leaves the queue on the next poll/invalidation.
  */
 
 const DISPATCH_QUERY = "assigned=false&status=received&sort=pickupStart";
 
-export function DispatchBoard({ resourceOptions }: { resourceOptions: TripFilterOptions }) {
+export function DispatchBoard({
+  resourceOptions,
+  cancelScope = "none",
+}: {
+  resourceOptions: TripFilterOptions;
+  /** 017 — how far this user's cancel permission reaches (§18); computed server-side. */
+  cancelScope?: CancelScope;
+}) {
   const t = useTranslations("Dispatch");
+  const tCancel = useTranslations("Trips.cancel");
   const board = useTripBoard(DISPATCH_QUERY);
 
   // The trip whose assign dialog is open.
   const [assignRow, setAssignRow] = useState<TripBoardRow | null>(null);
+  // The trip whose cancel dialog is open (017).
+  const [cancelRow, setCancelRow] = useState<TripBoardRow | null>(null);
 
   const items = board.data?.items ?? [];
 
@@ -82,9 +98,22 @@ export function DispatchBoard({ resourceOptions }: { resourceOptions: TripFilter
                     {t("pickup")}: {formatDateTime(row.plannedPickupWindowStart)}
                   </p>
                 </div>
-                <Button type="button" size="sm" onClick={() => setAssignRow(row)}>
-                  {t("assignAction")}
-                </Button>
+                <div className="flex gap-2">
+                  {canCancelTrip(cancelScope, row.currentStatus) ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="text-destructive"
+                      onClick={() => setCancelRow(row)}
+                    >
+                      {tCancel("action")}
+                    </Button>
+                  ) : null}
+                  <Button type="button" size="sm" onClick={() => setAssignRow(row)}>
+                    {t("assignAction")}
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
@@ -111,6 +140,16 @@ export function DispatchBoard({ resourceOptions }: { resourceOptions: TripFilter
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Cancel dialog (017) — the shared justified flow; one instance fed the row in scope. */}
+      {cancelRow ? (
+        <CancelTripDialog
+          tripId={cancelRow.id}
+          tripLabel={cancelRow.externalTripId}
+          open
+          onOpenChange={(open) => !open && setCancelRow(null)}
+        />
+      ) : null}
     </Card>
   );
 }

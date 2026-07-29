@@ -76,7 +76,48 @@
     "billing": "Faturamento",
     "rates": "Tarifas",
     "documentRequirements": "Requisitos de Documentos",
-    "reports": "Relatórios"
+    "reports": "Relatórios",
+    "freightRates": "Tabela de Fretes"
+  },
+  "FreightRates": {
+    "screenTitle": "Tabela de Fretes",
+    "description": "Consulta de fretes de agregados por rota, veículo e preço.",
+    "filters": {
+      "originUf": "UF Origem",
+      "originCity": "Cidade Origem",
+      "destinationUf": "UF Destino",
+      "destinationCity": "Cidade Destino",
+      "priceMin": "Preço mínimo (R$)",
+      "priceMax": "Preço máximo (R$)",
+      "cityPlaceholder": "Digite a cidade",
+      "all": "Todas",
+      "clear": "Limpar filtros"
+    },
+    "columns": {
+      "origin": "Origem",
+      "destination": "Destino",
+      "km": "Km",
+      "vehicleType": "Tipo de Veículo",
+      "valorIda": "Valor Ida",
+      "valorReversa": "Valor Reversa",
+      "observacoes": "Observações"
+    },
+    "empty": {
+      "noData": "Tabela de fretes ainda não carregada.",
+      "noDataCanImport": "Tabela de fretes ainda não carregada. Envie a planilha para começar.",
+      "noMatches": "Nenhuma rota encontrada com os filtros atuais."
+    },
+    "upload": {
+      "trigger": "Enviar planilha",
+      "title": "Substituir tabela de fretes",
+      "description": "Envie a planilha padrão (aba \"Controle de Fretes\"). A tabela inteira será substituída pelo conteúdo do arquivo.",
+      "submit": "Substituir tabela",
+      "submitting": "Enviando…",
+      "success": "Tabela substituída: {routes} rotas e {rates} tarifas carregadas.",
+      "issueRow": "Linha",
+      "issueColumn": "Coluna",
+      "issueMessage": "Problema"
+    }
   },
   "Roles": {
     "admin": "Administrador",
@@ -305,7 +346,8 @@
     "rate_create": "Tarifa criada",
     "rate_update": "Tarifa atualizada",
     "billing_item_update": "Item de faturamento atualizado",
-    "billing_export": "Exportação de faturamento gerada"
+    "billing_export": "Exportação de faturamento gerada",
+    "freight_rate_replace": "Tabela de fretes substituída"
   },
   "Documents": {
     "title": "Documentos",
@@ -970,6 +1012,39 @@
       "placeholderExceptions": "Exceções e risco de SLA — disponível em uma próxima etapa.",
       "placeholderDocuments": "Documentos da viagem — disponível em uma próxima etapa.",
       "placeholderBilling": "Detalhamento de faturamento — disponível em uma próxima etapa."
+    },
+    "cancel": {
+      "action": "Cancelar viagem",
+      "title": "Cancelar viagem",
+      "description": "O cancelamento é definitivo e exige justificativa completa (motivo, parte responsável e impacto de faturamento).",
+      "reasonLabel": "Motivo",
+      "reasonPlaceholder": "Selecione o motivo",
+      "responsibleLabel": "Parte responsável",
+      "responsiblePlaceholder": "Selecione a parte responsável",
+      "billingLabel": "Impacto de faturamento",
+      "billingPlaceholder": "Selecione o impacto",
+      "confirm": "Cancelar viagem",
+      "keep": "Voltar",
+      "submitting": "Cancelando…",
+      "success": "Viagem cancelada.",
+      "requiredField": "Campo obrigatório.",
+      "notConfigured": "Motivos de cancelamento não configurados. Contate um administrador.",
+      "errors": {
+        "NOT_CANCELLABLE": "A viagem não pode ser cancelada neste status.",
+        "NOT_CANCELLABLE_BY_ROLE": "Seu perfil só pode cancelar viagens na fase de expedição.",
+        "STALE_TRANSITION": "A viagem já mudou de status. Atualize a página e tente novamente.",
+        "CANCELLATION_NOT_CONFIGURED": "Motivos de cancelamento não configurados. Contate um administrador.",
+        "INVALID_REASON_CODE": "Motivo de cancelamento inválido.",
+        "INVALID_BILLING_IMPACT": "Impacto de faturamento inválido.",
+        "NOT_FOUND": "Viagem não encontrada.",
+        "REQUEST_FAILED": "Não foi possível cancelar a viagem. Tente novamente."
+      },
+      "responsible": {
+        "customer_caused": "Cliente",
+        "brazil_transports_caused": "Brazil Transports",
+        "carrier_caused": "Transportadora",
+        "unknown": "Desconhecida"
+      }
     },
     "auditActions": {
       "trip": {
