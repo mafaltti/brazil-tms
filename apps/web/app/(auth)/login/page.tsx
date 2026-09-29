@@ -57,7 +57,7 @@ function LoginForm() {
   return (
     <>
       <p className="mt-6 flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6B7566] dark:text-muted-foreground">
-        <span className="size-2 rounded-full bg-[#D9BA05]" />
+        <span className="size-2 rounded-full bg-[var(--login-accent,#D9BA05)]" />
         {t("portalEyebrow")}
       </p>
       <h1 className="mt-2.5 text-[25px] font-semibold leading-tight tracking-[-0.02em] text-[#1B2418] dark:text-foreground xl:text-[28px]">

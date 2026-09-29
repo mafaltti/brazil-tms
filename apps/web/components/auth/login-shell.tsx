@@ -1,34 +1,48 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Waypoints } from "lucide-react";
 import { loginArtFor } from "@/lib/login-art";
+import { AwarenessRibbon } from "./awareness-ribbon";
 
-const ACCENT = "#D9BA05";
+/** Ribbons sit on the frame corners, slightly tilted outward. */
+const RIBBON_CORNERS = [
+  "-left-1 -top-1 -rotate-[18deg]",
+  "-right-1 -top-1 rotate-[18deg]",
+  "-bottom-1 -left-1 -rotate-[10deg]",
+  "-bottom-1 -right-1 rotate-[10deg]",
+];
 
 /**
  * Two-column login frame: brand panel with the (seasonal) art on the left, the form on the right.
  * The panel hides below `lg`. The art sits in a frame locked to its own 888:499 ratio, so it never
  * crops on any screen; a blurred copy fills the rest of the panel behind the green overlay.
+ * Frame, backdrop and accents follow the art's palette; campaigns add ribbons and a note.
  */
 export function LoginShell({ children }: { children: ReactNode }) {
   const t = useTranslations("Auth.panel");
   const searchParams = useSearchParams();
   const art = loginArtFor(new Date(), searchParams.get("arte"));
+  const { palette } = art;
+  const vars = {
+    "--login-accent": palette.accent,
+    "--login-frame": palette.frame,
+    "--login-frame-dark": palette.frameDark,
+    "--login-glow": palette.glow,
+  } as CSSProperties;
 
   return (
-    <div className="relative w-full">
+    <div className={`relative w-full ${art.campaign ? "p-2" : ""}`} style={vars}>
       <div
         aria-hidden
         className="fixed inset-0 dark:hidden"
-        style={{
-          background:
-            "radial-gradient(1100px 620px at 12% 8%, #E7EDE2 0%, rgba(231,237,226,0) 62%), radial-gradient(900px 560px at 92% 96%, #E4EAF1 0%, rgba(228,234,241,0) 58%), linear-gradient(160deg, #F4F6F1 0%, #EEF2EA 52%, #E9EEE6 100%)",
-        }}
+        style={{ background: palette.backdrop }}
       />
-      <div className="relative flex min-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-[26px] border border-black/[0.06] bg-white p-2.5 shadow-[0_40px_90px_-45px_rgba(23,38,18,0.45)] dark:border-border dark:bg-card dark:shadow-[0_40px_90px_-45px_rgba(0,0,0,0.8)]">
+      <div
+        className={`relative flex flex-col overflow-hidden rounded-[26px] border-[var(--login-frame)] bg-white p-2.5 shadow-[0_40px_90px_-45px_var(--login-glow)] dark:border-[var(--login-frame-dark)] dark:bg-card dark:shadow-[0_40px_90px_-45px_rgba(0,0,0,0.8)] ${art.campaign ? "min-h-[calc(100vh-3rem)] border-[3px] ring-4 ring-white/60 dark:ring-black/20" : "min-h-[calc(100vh-2rem)] border"}`}
+      >
         <div className="grid flex-1 gap-2.5 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,1fr)]">
           <div
             className="relative hidden overflow-hidden rounded-[22px] bg-[#1D2B18] lg:block"
@@ -40,17 +54,11 @@ export function LoginShell({ children }: { children: ReactNode }) {
               alt=""
               className="absolute inset-0 h-full w-full scale-[1.25] object-cover blur-[26px] saturate-[1.25] brightness-[1.05]"
             />
-            <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  "linear-gradient(180deg, rgba(62,86,53,0.77) 0%, rgba(62,86,53,0.48) 34%, rgba(62,86,53,0.27) 52%, rgba(36,51,24,0.42) 74%, rgba(29,43,24,0.85) 100%)",
-              }}
-            />
+            <div className="absolute inset-0" style={{ background: palette.overlay }} />
             <div className="relative flex h-full flex-col p-4 xl:p-6">
               <div className="shrink-0 rounded-[18px] border border-white/25 bg-white/10 p-5 shadow-[0_18px_50px_-30px_rgba(0,0,0,0.9)] backdrop-blur-md xl:p-6">
                 <p className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/90">
-                  <span className="h-[3px] w-6 rounded-full" style={{ background: ACCENT }} />
+                  <span className="h-[3px] w-6 rounded-full bg-[var(--login-accent)]" />
                   {t("eyebrow")}
                 </p>
                 <h2 className="mt-4 text-[26px] font-bold leading-[1.1] tracking-[-0.02em] text-white xl:text-[32px]">
@@ -109,11 +117,32 @@ export function LoginShell({ children }: { children: ReactNode }) {
                   </span>
                 </div>
                 {children}
+                {art.campaign ? (
+                  <div className="mt-8 flex items-center gap-3.5 rounded-2xl border border-[var(--login-frame)] bg-[#FFF4F8] p-3.5 dark:border-[var(--login-frame-dark)] dark:bg-[#2A1520]">
+                    <AwarenessRibbon className="h-10 w-6 shrink-0" />
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C2185B] dark:text-[#F48FB1]">
+                        {t(`campaign.${art.id}.title`)}
+                      </p>
+                      <p className="mt-1 text-[13px] leading-snug text-[#6B4A57] dark:text-muted-foreground">
+                        {t(`campaign.${art.id}.text`)}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
         </div>
       </div>
+      {art.campaign
+        ? RIBBON_CORNERS.map((corner) => (
+            <AwarenessRibbon
+              key={corner}
+              className={`pointer-events-none absolute z-10 h-[72px] w-11 drop-shadow-[0_6px_12px_rgba(176,42,99,0.4)] ${corner}`}
+            />
+          ))
+        : null}
     </div>
   );
 }

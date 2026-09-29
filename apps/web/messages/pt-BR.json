@@ -59,6 +59,12 @@
       "footerCaption": "Gestão de transportes",
       "logoAlt": "Brazil Transports",
       "productName": "TMS",
+      "campaign": {
+        "outubro-rosa": {
+          "title": "Outubro Rosa",
+          "text": "A Brazil Transports apoia a prevenção e o diagnóstico precoce do câncer de mama. Cuide-se e faça seus exames."
+        }
+      },
       "art": {
         "padrao": "Carreta da Brazil Transports na estrada",
         "outubro-rosa": "Carreta rosa com o laço do Outubro Rosa, mês de prevenção ao câncer de mama"
