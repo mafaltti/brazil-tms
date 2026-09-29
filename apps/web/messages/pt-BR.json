@@ -44,7 +44,26 @@
     "setPasswordSuccess": "Senha alterada com sucesso.",
     "passwordMismatch": "As senhas não coincidem.",
     "passwordTooShort": "A senha deve ter no mínimo 8 caracteres.",
-    "linkInvalid": "Link inválido ou expirado. Solicite um novo."
+    "linkInvalid": "Link inválido ou expirado. Solicite um novo.",
+    "portalEyebrow": "Portal da operação",
+    "welcomeTitle": "Bem-vindo de volta.",
+    "welcomeSubtitle": "Tudo pronto para seguir viagem. Acesse sua conta para começar.",
+    "panel": {
+      "eyebrow": "Movendo o Brasil",
+      "headline1": "Sua operação.",
+      "headline2": "Na direção",
+      "headline3": "certa.",
+      "tagline1": "Pessoas, rotas e entregas.",
+      "tagline2": "Uma operação conectada.",
+      "footer": "O próximo destino começa aqui.",
+      "footerCaption": "Gestão de transportes",
+      "logoAlt": "Brazil Transports",
+      "productName": "TMS",
+      "art": {
+        "padrao": "Carreta da Brazil Transports na estrada",
+        "outubro-rosa": "Carreta rosa com o laço do Outubro Rosa, mês de prevenção ao câncer de mama"
+      }
+    }
   },
   "Shell": {
     "signOut": "Sair",
